@@ -1,0 +1,16 @@
+package com.alin.lin.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Builder
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class UpdateChangeCaseStatusRequest {
+    private String policyNo;
+    private Integer policySeq;
+    private String acceptanceStatus;
+}

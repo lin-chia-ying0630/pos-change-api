@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.alin.lin.mapper.PosChangeMapper">
+    <resultMap id="PosChangeResultMap" type="com.alin.lin.entity.PosChange">
+        <id property="id" column="id"/>
+        <result property="storeId" column="store_id"/>
+        <result property="terminalId" column="terminal_id"/>
+        <result property="changeAmount" column="change_amount"/>
+        <result property="reason" column="reason"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <select id="findAll" resultMap="PosChangeResultMap">
+        SELECT id,
+               store_id,
+               terminal_id,
+               change_amount,
+               reason,
+               created_at,
+               updated_at
+        FROM pos_change
+        ORDER BY id DESC
+    </select>
+
+    <select id="findById" resultMap="PosChangeResultMap">
+        SELECT id,
+               store_id,
+               terminal_id,
+               change_amount,
+               reason,
+               created_at,
+               updated_at
+        FROM pos_change
+        WHERE id = #{id}
+    </select>
+
+    <insert id="insert" parameterType="com.alin.lin.entity.PosChange" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO pos_change (store_id, terminal_id, change_amount, reason)
+        VALUES (#{storeId}, #{terminalId}, #{changeAmount}, #{reason})
+    </insert>
+
+    <update id="update" parameterType="com.alin.lin.entity.PosChange">
+        UPDATE pos_change
+        SET store_id = #{storeId},
+            terminal_id = #{terminalId},
+            change_amount = #{changeAmount},
+            reason = #{reason}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE
+        FROM pos_change
+        WHERE id = #{id}
+    </delete>
+</mapper>

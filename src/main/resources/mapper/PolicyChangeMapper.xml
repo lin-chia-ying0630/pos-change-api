@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.alin.lin.mapper.PolicyChangeMapper">
+    <resultMap id="MainPolicyMasterResultMap" type="com.alin.lin.entity.MainPolicyMaster">
+        <id property="policyNo" column="policy_no"/>
+        <id property="policySeq" column="policy_seq"/>
+        <result property="mainProductCode" column="main_product_code"/>
+        <result property="mainPolicyYears" column="main_policy_years"/>
+        <result property="insuredAmount" column="insured_amount"/>
+        <result property="premium" column="premium"/>
+    </resultMap>
+
+    <resultMap id="MainPolicyAddressResultMap" type="com.alin.lin.entity.MainPolicyAddress">
+        <id property="policyNo" column="policy_no"/>
+        <id property="policySeq" column="policy_seq"/>
+        <id property="addressType" column="address_type"/>
+        <result property="zipCode3" column="zip_code3"/>
+        <result property="zipCode2" column="zip_code2"/>
+        <result property="fullWidthAddress" column="full_width_address"/>
+        <result property="halfWidthAddress" column="half_width_address"/>
+    </resultMap>
+
+    <resultMap id="MainPolicyRideResultMap" type="com.alin.lin.entity.MainPolicyRide">
+        <id property="policyNo" column="policy_no"/>
+        <id property="policySeq" column="policy_seq"/>
+        <id property="rideOrder" column="ride_order"/>
+        <result property="rideType" column="ride_type"/>
+        <result property="productCode" column="product_code"/>
+        <result property="policyYears" column="policy_years"/>
+        <result property="insuredAmount" column="insured_amount"/>
+        <result property="premium" column="premium"/>
+    </resultMap>
+
+    <resultMap id="CodeDescriptionResultMap" type="com.alin.lin.entity.CodeDescription">
+        <id property="codeGroup" column="code_group"/>
+        <id property="codeField" column="code_field"/>
+        <id property="codeBefore" column="code_before"/>
+        <result property="codeAfter" column="code_after"/>
+        <result property="codeDescription" column="code_description"/>
+    </resultMap>
+
+    <resultMap id="PolicyChangeCaseResultMap" type="com.alin.lin.dto.PolicyChangeCaseDto">
+        <id property="policyNo" column="policy_no"/>
+        <id property="policySeq" column="policy_seq"/>
+        <id property="changeCaseNo" column="change_case_no"/>
+        <result property="acceptanceStatus" column="acceptance_status"/>
+        <result property="changeItems" column="change_items"/>
+        <result property="changeItemDescriptions" column="change_item_descriptions"/>
+    </resultMap>
+
+    <resultMap id="PolicyChangeFieldResultMap" type="com.alin.lin.entity.PolicyChangeField">
+        <id property="id" column="id"/>
+        <result property="policyNo" column="policy_no"/>
+        <result property="policySeq" column="policy_seq"/>
+        <result property="changeCaseNo" column="change_case_no"/>
+        <result property="changeItem" column="change_item"/>
+        <result property="changeField" column="change_field"/>
+        <result property="changeKey" column="change_key"/>
+        <result property="contentBefore" column="content_before"/>
+        <result property="contentAfter" column="content_after"/>
+    </resultMap>
+
+    <resultMap id="PolicyChangeFileResultMap" type="com.alin.lin.entity.PolicyChangeFile">
+        <id property="id" column="id"/>
+        <result property="policyNo" column="policy_no"/>
+        <result property="policySeq" column="policy_seq"/>
+        <result property="changeCaseNo" column="change_case_no"/>
+        <result property="changeItem" column="change_item"/>
+        <result property="changeFile" column="change_file"/>
+        <result property="contentBefore" column="content_before"/>
+        <result property="contentAfter" column="content_after"/>
+    </resultMap>
+
+    <select id="findMaster" resultMap="MainPolicyMasterResultMap">
+        SELECT policy_no,
+               policy_seq,
+               main_product_code,
+               main_policy_years,
+               insured_amount,
+               premium
+        FROM main_policy_master
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+    </select>
+
+    <select id="findAddress" resultMap="MainPolicyAddressResultMap">
+        SELECT policy_no,
+               policy_seq,
+               address_type,
+               zip_code3,
+               zip_code2,
+               full_width_address,
+               half_width_address
+        FROM main_policy_address
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND address_type = #{addressType}
+    </select>
+
+    <select id="findAddresses" resultMap="MainPolicyAddressResultMap">
+        SELECT policy_no,
+               policy_seq,
+               address_type,
+               zip_code3,
+               zip_code2,
+               full_width_address,
+               half_width_address
+        FROM main_policy_address
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+        ORDER BY address_type
+    </select>
+
+    <select id="findRides" resultMap="MainPolicyRideResultMap">
+        SELECT policy_no,
+               policy_seq,
+               ride_type,
+               ride_order,
+               product_code,
+               policy_years,
+               insured_amount,
+               premium
+        FROM main_policy_ride
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+        ORDER BY ride_order
+    </select>
+
+    <select id="findCodes" resultMap="CodeDescriptionResultMap">
+        SELECT code_group,
+               code_field,
+               code_before,
+               code_after,
+               code_description
+        FROM code_description
+        WHERE code_group = #{codeGroup}
+          AND code_field = #{codeField}
+        ORDER BY code_before
+    </select>
+
+    <select id="existsChangeCaseNo" resultType="int">
+        SELECT COUNT(*)
+        FROM policy_change_acceptance
+        WHERE change_case_no = #{changeCaseNo}
+    </select>
+
+    <select id="findMaxChangeCaseNoByPrefix" resultType="string">
+        SELECT MAX(change_case_no)
+        FROM policy_change_acceptance
+        WHERE change_case_no LIKE CONCAT(#{changeCaseNoPrefix}, '%')
+    </select>
+
+    <select id="findChangeCases" resultMap="PolicyChangeCaseResultMap">
+        SELECT a.policy_no,
+               a.policy_seq,
+               a.change_case_no,
+               a.acceptance_status,
+               GROUP_CONCAT(i.change_item ORDER BY i.change_item SEPARATOR ',') AS change_items,
+               GROUP_CONCAT(COALESCE(cd.code_description, i.change_item) ORDER BY i.change_item SEPARATOR ',') AS change_item_descriptions
+        FROM policy_change_acceptance a
+        LEFT JOIN policy_change_item i
+          ON i.policy_no = a.policy_no
+         AND i.policy_seq = a.policy_seq
+         AND i.change_case_no = a.change_case_no
+        LEFT JOIN code_description cd
+          ON cd.code_group = 'policy-change-item'
+         AND cd.code_field = 'change_item'
+         AND cd.code_before = i.change_item
+        WHERE a.policy_no = #{policyNo}
+        GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status, a.created_at
+        ORDER BY a.created_at DESC
+    </select>
+
+    <select id="findChangeCase" resultMap="PolicyChangeCaseResultMap">
+        SELECT a.policy_no,
+               a.policy_seq,
+               a.change_case_no,
+               a.acceptance_status,
+               GROUP_CONCAT(i.change_item ORDER BY i.change_item SEPARATOR ',') AS change_items,
+               GROUP_CONCAT(COALESCE(cd.code_description, i.change_item) ORDER BY i.change_item SEPARATOR ',') AS change_item_descriptions
+        FROM policy_change_acceptance a
+        LEFT JOIN policy_change_item i
+          ON i.policy_no = a.policy_no
+         AND i.policy_seq = a.policy_seq
+         AND i.change_case_no = a.change_case_no
+        LEFT JOIN code_description cd
+          ON cd.code_group = 'policy-change-item'
+         AND cd.code_field = 'change_item'
+         AND cd.code_before = i.change_item
+        WHERE a.policy_no = #{policyNo}
+          AND a.policy_seq = #{policySeq}
+          AND a.change_case_no = #{changeCaseNo}
+        GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status
+    </select>
+
+    <select id="findChangeItemsByCaseNo" resultType="string">
+        SELECT change_item
+        FROM policy_change_item
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+        ORDER BY change_item
+    </select>
+
+    <select id="findChangeFilesByItem" resultMap="PolicyChangeFileResultMap">
+        SELECT id,
+               policy_no,
+               policy_seq,
+               change_case_no,
+               change_item,
+               change_file,
+               content_before,
+               content_after
+        FROM policy_change_file
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+          AND change_item = #{changeItem}
+        ORDER BY id
+    </select>
+
+    <select id="findChangeFieldsByItem" resultMap="PolicyChangeFieldResultMap">
+        SELECT id,
+               policy_no,
+               policy_seq,
+               change_case_no,
+               change_item,
+               change_field,
+               change_key,
+               content_before,
+               content_after
+        FROM policy_change_field
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+          AND change_item = #{changeItem}
+        ORDER BY id
+    </select>
+
+    <insert id="insertAcceptance">
+        INSERT INTO policy_change_acceptance (policy_no, policy_seq, change_case_no, acceptance_status)
+        VALUES (#{policyNo}, #{policySeq}, #{changeCaseNo}, #{acceptanceStatus})
+    </insert>
+
+    <insert id="insertChangeItem">
+        INSERT INTO policy_change_item (policy_no, policy_seq, change_case_no, change_item)
+        VALUES (#{policyNo}, #{policySeq}, #{changeCaseNo}, #{changeItem})
+    </insert>
+
+    <select id="existsChangeItem" resultType="int">
+        SELECT COUNT(*)
+        FROM policy_change_item
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+          AND change_item = #{changeItem}
+    </select>
+
+    <insert id="insertChangeField">
+        INSERT INTO policy_change_field (
+            policy_no,
+            policy_seq,
+            change_case_no,
+            change_item,
+            change_field,
+            change_key,
+            content_before,
+            content_after
+        )
+        VALUES (
+            #{policyNo},
+            #{policySeq},
+            #{changeCaseNo},
+            #{changeItem},
+            #{changeField},
+            #{changeKey},
+            #{contentBefore},
+            #{contentAfter}
+        )
+    </insert>
+
+    <insert id="insertChangeFile">
+        INSERT INTO policy_change_file (
+            policy_no,
+            policy_seq,
+            change_case_no,
+            change_item,
+            change_file,
+            content_before,
+            content_after
+        )
+        VALUES (
+            #{policyNo},
+            #{policySeq},
+            #{changeCaseNo},
+            #{changeItem},
+            #{changeFile},
+            #{contentBefore},
+            #{contentAfter}
+        )
+    </insert>
+
+    <update id="updateAcceptanceStatus">
+        UPDATE policy_change_acceptance
+        SET acceptance_status = #{acceptanceStatus}
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+    </update>
+
+    <update id="updateAddress">
+        UPDATE main_policy_address
+        SET zip_code3 = #{zipCode3},
+            zip_code2 = #{zipCode2},
+            full_width_address = #{fullWidthAddress},
+            half_width_address = #{halfWidthAddress}
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND address_type = #{addressType}
+    </update>
+
+    <update id="updateMasterField">
+        UPDATE main_policy_master
+        <set>
+            <choose>
+                <when test="changeField == 'main_product_code'">main_product_code = #{contentAfter},</when>
+                <when test="changeField == 'main_policy_years'">main_policy_years = CAST(#{contentAfter} AS SIGNED),</when>
+                <when test="changeField == 'insured_amount'">insured_amount = CAST(#{contentAfter} AS DECIMAL(10, 2)),</when>
+                <when test="changeField == 'premium'">premium = CAST(#{contentAfter} AS DECIMAL(17, 4)),</when>
+            </choose>
+        </set>
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+    </update>
+
+    <update id="updateRideAmount">
+        UPDATE main_policy_ride
+        SET insured_amount = CAST(#{insuredAmount} AS DECIMAL(10, 2))
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND ride_order = #{rideOrder}
+    </update>
+</mapper>
