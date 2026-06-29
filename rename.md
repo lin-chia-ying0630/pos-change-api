@@ -1,64 +1,64 @@
-# POS Change API Rename Notes
+# POS Change API 命名整理
 
-## Naming Principle
+## 命名原則
 
-Backend names should describe the layer and purpose clearly:
+後端命名要清楚表達所在層級與用途：
 
-- Entity: database row model.
-- DTO: API or use-case payload.
-- Request DTO: incoming request body.
-- DAO: persistence access wrapper.
-- Mapper: MyBatis SQL interface.
-- Response envelope: only `ResponseBodyDto<T>`.
+- Entity：資料庫資料列模型。
+- DTO：API 或 use case 的資料承載物件。
+- Request DTO：傳入 request body。
+- DAO：資料存取封裝。
+- Mapper：MyBatis SQL 介面。
+- Response envelope：只使用 `ResponseBodyDto<T>`。
 
-Avoid naming shared payload DTOs as `*Response` when they are not the response envelope.
+共用 payload DTO 不應命名成 `*Response`，除非它真的代表回覆外層格式。
 
-## Layer Naming
+## 分層命名
 
 ### Controller
 
-Controllers handle HTTP routing and response wrapping only.
+Controller 只處理 HTTP 路由與回覆包裝。
 
-Example:
+範例：
 
 - `PolicyChangeController`
 
 ### Service
 
-Service must have an interface and implementation.
+Service 必須有介面與實作。
 
-Examples:
+範例：
 
 - `PolicyChangeService`
 - `PolicyChangeServiceImpl`
 
-Business rules belong in the service implementation.
+商業規則放在 Service implementation。
 
 ### DAO
 
-DAO means persistence access object. It is not a request or response payload.
+DAO 是資料存取物件，不是 request 或 response payload。
 
-Examples:
+範例：
 
 - `PolicyChangeDao`
 - `PosChangeDao`
 
-DAO calls mapper methods and keeps SQL access out of the service.
+DAO 呼叫 Mapper 方法，讓 Service 不直接碰 SQL 存取細節。
 
 ### Mapper
 
-Mapper means MyBatis mapper interface and XML SQL file.
+Mapper 是 MyBatis mapper 介面與 XML SQL 檔。
 
-Examples:
+範例：
 
 - `PolicyChangeMapper`
 - `PolicyChangeMapper.xml`
 
 ### Entity
 
-Entity classes map table rows.
+Entity 對應資料表資料列。
 
-Examples:
+範例：
 
 - `MainPolicyMaster`
 - `MainPolicyAddress`
@@ -67,11 +67,11 @@ Examples:
 - `PolicyChangeFile`
 - `CodeDescription`
 
-## DTO Naming
+## DTO 命名
 
-DTO classes are payload models used by the API or service layer.
+DTO 是 API 或 Service 層使用的資料模型。
 
-Shared result DTOs:
+共用結果 DTO：
 
 - `PolicyDetailDto`
 - `CreateChangeCaseDto`
@@ -80,7 +80,7 @@ Shared result DTOs:
 - `PolicyChangeCaseDto`
 - `UpdateChangeCaseStatusDto`
 
-Request DTOs:
+Request DTO：
 
 - `CreateChangeCaseRequest`
 - `AddressChangeRequest`
@@ -90,43 +90,43 @@ Request DTOs:
 - `UpdateChangeCaseStatusRequest`
 - `PosChangeRequest`
 
-Response envelope:
+回覆外層：
 
 - `ResponseBodyDto<T>`
 
-## Prior Rename Decisions
+## 先前重新命名決策
 
-These names should not come back as response-only classes:
+以下名稱不應再作為 response-only class 回來：
 
 - `PolicyDetailResponse`
 - `CreateChangeCaseResponse`
 - `AddressChangeResponse`
 
-Use these shared names instead:
+請改用共用名稱：
 
 - `PolicyDetailDto`
 - `CreateChangeCaseDto`
 - `AddressChangeDto`
 
-The earlier `PolicyDetailList` idea was resolved as shared DTO naming. It should not be limited to only API response usage.
+先前提到的 `PolicyDetailList` 已整理為共用 DTO 命名，不應限定成只有 API 回覆用途。
 
-## DAO vs DTO
+## DAO 與 DTO 區分
 
-DAO and DTO are different responsibilities:
+DAO 與 DTO 職責不同：
 
-- DAO: talks to database through mapper methods.
-- DTO: carries request or result data between controller, service, and client.
-- Entity: represents database table rows.
+- DAO：透過 Mapper 與資料庫互動。
+- DTO：在 Controller、Service 與 Client 之間傳遞 request 或 result data。
+- Entity：代表資料庫資料表資料列。
 
-Example:
+範例：
 
-- `PosChangeDao` is DAO.
-- `PosChangeRequest` is DTO because it is request data.
-- `MainPolicyMaster` is entity because it maps a table row.
+- `PosChangeDao` 是 DAO。
+- `PosChangeRequest` 是 DTO，因為它是 request data。
+- `MainPolicyMaster` 是 Entity，因為它對應資料表資料列。
 
-## Lombok Standard
+## Lombok 標準
 
-DTO and entity classes should use Lombok to keep the code compact:
+DTO 與 Entity 應使用 Lombok 讓程式碼簡潔：
 
 ```java
 @Builder
@@ -135,36 +135,36 @@ DTO and entity classes should use Lombok to keep the code compact:
 @AllArgsConstructor
 ```
 
-Keep this standard for new DTOs and entities unless a framework-specific constructor or immutable model is intentionally needed.
+新增 DTO 與 Entity 時維持此標準，除非有框架需求或刻意設計成不可變模型。
 
-## Business Key Naming
+## 商業 Key 命名
 
-`policy_change_field.change_key` records the target row key when multiple rows can belong to one policy:
+`policy_change_field.change_key` 用來記錄目標資料列 key。當同一張保單有多筆相關資料時，靠它定位要回寫哪一筆：
 
-- Address change `001`: `change_key = address_type`.
-- Main amount change `002`: `change_key = MASTER` for master and `change_key = 000` for the main ride row.
-- Rider amount change `003`: `change_key = ride_order`.
+- 地址變更 `001`：`change_key = address_type`。
+- 主約保額變更 `002`：主檔用 `change_key = MASTER`，主約附約列用 `change_key = 000`。
+- 附約保額變更 `003`：`change_key = ride_order`。
 
-This prevents applying a saved change to the wrong address or rider amount.
+這可以避免把儲存的變更套用到錯誤地址或錯誤附約保額。
 
-## Change Item Naming
+## 變更項目命名
 
-Keep business codes as strings:
+商業代碼維持字串：
 
-- `001`: address change.
-- `002`: main policy insured amount change.
-- `003`: rider insured amount change.
+- `001`：地址變更。
+- `002`：主約保額變更。
+- `003`：附約保額變更。
 
-Do not replace these values with enum names in request or database payloads unless the database and front end are changed together.
+除非資料庫與前端一起調整，否則不要在 request 或資料庫 payload 中改成 enum 名稱。
 
-## Status Naming
+## 狀態命名
 
-Keep acceptance statuses as uppercase strings:
+受理狀態維持大寫字串：
 
-- `P`: pending / 受理中.
-- `S`: completed / 完成.
-- `C`: cancelled / 取消.
+- `P`：受理中。
+- `S`：完成。
+- `C`：取消。
 
-Create flow only produces `P`.
+新增流程只產生 `P`。
 
-Review flow is responsible for changing `P` to `S` or `C`.
+覆核流程負責將 `P` 改為 `S` 或 `C`。

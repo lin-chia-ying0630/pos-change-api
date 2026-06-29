@@ -1,10 +1,10 @@
-# POS Change API Skill
+# POS Change API 技能說明
 
-## Purpose
+## 目的
 
-`pos-change-api` is the Spring Boot backend for the POS policy-change workflow. It handles policy lookup, change-case number generation, pending change recording, and review-time application of approved changes.
+`pos-change-api` 是 POS 保全變更流程的 Spring Boot 後端。負責保單查詢、變更案號產生、保全受理資料暫存，以及覆核完成時將核准的變更回寫到主檔、地址或附約資料。
 
-## Stack
+## 技術棧
 
 - Java 17
 - Spring Boot
@@ -14,15 +14,15 @@
 - Maven
 - Docker
 
-## Architecture
+## 架構
 
-The backend follows a three-layer structure:
+後端採三層架構：
 
-- Controller: receives HTTP requests and returns `ResponseBodyDto<T>`.
-- Service interface and implementation: contains business rules and transaction control.
-- DAO / Mapper: wraps MyBatis mapper calls and SQL access.
+- Controller：接收 HTTP 請求，並統一回傳 `ResponseBodyDto<T>`。
+- Service 介面與實作：處理商業規則與交易控制。
+- DAO / Mapper：封裝 MyBatis 呼叫與 SQL 存取。
 
-Primary flow classes:
+主要流程類別：
 
 - `PolicyChangeController`
 - `PolicyChangeService`
@@ -31,13 +31,13 @@ Primary flow classes:
 - `PolicyChangeMapper`
 - `PolicyChangeMapper.xml`
 
-## API Response Contract
+## API 回覆格式
 
-All API responses should be wrapped by `ResponseBodyDto<T>` through `ResponseUtil`.
+所有 API 回覆都應透過 `ResponseUtil` 包成 `ResponseBodyDto<T>`。
 
-Request bodies are normal request DTOs and are not wrapped in `ResponseBodyDto`.
+傳入的 request body 使用一般 Request DTO，不需要包 `ResponseBodyDto`。
 
-Important examples:
+重要範例：
 
 - `ResponseBodyDto<PolicyDetailDto>`
 - `ResponseBodyDto<CreateChangeCaseDto>`
@@ -46,73 +46,73 @@ Important examples:
 - `ResponseBodyDto<List<PolicyChangeCaseDto>>`
 - `ResponseBodyDto<UpdateChangeCaseStatusDto>`
 
-## Main Endpoints
+## 主要 API
 
-- `GET /api/policies/{policyNo}/{policySeq}`: query policy master, communication address, all address rows, ride rows, and change-item codes.
-- `POST /api/change-cases`: generate a case number only. The case is pending `P` but is not saved until a real change is saved.
-- `POST /api/change-cases/address-change`: save address change fields and change-file snapshot for item `001`.
-- `POST /api/change-cases/main-amount-change`: save main policy amount changes for item `002`.
-- `POST /api/change-cases/rider-amount-change`: save rider amount changes for item `003`.
-- `GET /api/policies/{policyNo}/change-cases`: query acceptance cases by policy number.
-- `PATCH /api/change-cases/{changeCaseNo}/status`: review action. Only this endpoint can change `P` to `S` or `C`.
+- `GET /api/policies/{policyNo}/{policySeq}`：查詢保單主檔、通訊地址、全部地址資料、附約資料與變更項目代碼。
+- `POST /api/change-cases`：只產生變更案號。狀態為 `P`，但尚未寫入受理資料，需等真的有異動資料時才存檔。
+- `POST /api/change-cases/address-change`：儲存 `001` 地址變更欄位與變更前後快照。
+- `POST /api/change-cases/main-amount-change`：儲存 `002` 主約保額變更。
+- `POST /api/change-cases/rider-amount-change`：儲存 `003` 附約保額變更。
+- `GET /api/policies/{policyNo}/change-cases`：依保單號碼查詢保全受理資料。
+- `PATCH /api/change-cases/{changeCaseNo}/status`：覆核動作。只有這支 API 可以將 `P` 改為 `S` 或 `C`。
 
-## Business Rules
+## 商業規則
 
-### Case Number
+### 案號規則
 
-Case number format:
+案號格式：
 
 ```text
 C + 民國年 3 碼 + 月 2 碼 + 日 2 碼 + 流水號至少 3 碼
 ```
 
-Example:
+範例：
 
 ```text
 C1150629001
 ```
 
-The service uses Taipei date for the prefix.
+服務使用台北時區日期產生案號前綴。
 
-### Status
+### 受理狀態
 
-- `P`: pending / 受理中.
-- `S`: completed / 完成.
-- `C`: cancelled / 取消.
+- `P`：受理中。
+- `S`：完成。
+- `C`：取消。
 
-New change cases are `P`.
+新增保全變更只會產生 `P`。
 
-Only review can update:
+只有覆核可以更新狀態：
 
-- `P` to `S`: apply saved changes to master/address/ride tables.
-- `P` to `C`: cancel without applying saved changes.
+- `P` 改 `S`：將已儲存的變更回寫到主檔、地址或附約資料。
+- `P` 改 `C`：取消，不回寫變更。
 
-### 001 Address Change
+### 001 地址變更
 
-- Uses `main_policy_address`.
-- The front end may display all address-related rows for the policy.
-- Backend stores changed fields in `policy_change_field`.
-- Backend stores before/after address snapshots in `policy_change_file`.
-- `policy_change_field.change_key` stores `address_type`.
+- 使用 `main_policy_address`。
+- 前端可顯示該保單關聯的所有地址資料，不限定固定三筆。
+- 後端將異動欄位寫入 `policy_change_field`。
+- 後端將地址變更前後快照寫入 `policy_change_file`。
+- `policy_change_field.change_key` 存放 `address_type`。
 
-### 002 Main Policy Amount Change
+### 002 主約保額變更
 
-- Changes the master insured amount.
-- Must record both:
-  - `main_policy_master.insured_amount` with `change_key = MASTER`
-  - `main_policy_ride.000.insured_amount` with `change_key = 000`
-- On approval `S`, both master and the matching main ride row are updated together.
+- 變更主檔保額。
+- 必須同時記錄：
+  - `main_policy_master.insured_amount`，`change_key = MASTER`
+  - `main_policy_ride.000.insured_amount`，`change_key = 000`
+- 覆核完成 `S` 時，主檔與對應的主約附約列要一起回寫。
 
-### 003 Rider Amount Change
+### 003 附約保額變更
 
-- Changes rider insured amount.
-- Must not change the main contract row.
-- Rows with `ride_type = 1` or `ride_order = 000` are treated as main contract rows.
-- `policy_change_field.change_key` stores `ride_order` so the correct rider row is updated.
+- 變更附約保額。
+- 不可變更主約列。
+- `ride_type = 1` 或 `ride_order = 000` 視為主約列。
+- `policy_change_field.change_key` 存放 `ride_order`，避免回寫到錯誤附約。
 
-## Database Tables
+## 資料表
 
-Core business tables:
+核心商業資料表：
 
 - `main_policy_master`
 - `main_policy_address`
@@ -123,21 +123,21 @@ Core business tables:
 - `policy_change_file`
 - `code_description`
 
-`policy_change_field.change_key` is important for locating the target row when more than one row can share the same policy number and sequence.
+`policy_change_field.change_key` 很重要，當同一張保單與序號下有多筆目標資料時，用它定位實際要修改的資料列。
 
-## Local Run
+## 本機啟動
 
 ```bash
 DB_PASSWORD=12345678 mvn spring-boot:run
 ```
 
-Backend default port:
+後端預設 port：
 
 ```text
 8081
 ```
 
-Database connection can be controlled by environment variables:
+資料庫連線可用環境變數控制：
 
 ```text
 DB_URL
@@ -145,7 +145,7 @@ DB_USERNAME
 DB_PASSWORD
 ```
 
-## Verification
+## 驗證
 
 ```bash
 DB_PASSWORD=12345678 mvn test
@@ -154,9 +154,9 @@ docker build -t pos-change-api:latest .
 
 ## Docker
 
-The Docker image builds the Maven jar in one stage and runs it with Java 17 JRE in the runtime stage.
+Docker image 使用多階段建置：第一階段用 Maven 建 jar，第二階段用 Java 17 JRE 執行。
 
-Runtime container still needs database environment variables, for example:
+容器執行時仍需要資料庫環境變數，例如：
 
 ```bash
 docker run --rm -p 8081:8081 \
