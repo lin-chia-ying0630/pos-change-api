@@ -20,5 +20,7 @@ public class PolicyDetailDto {
     private MainPolicyAddress communicationAddress;
     private List<MainPolicyAddress> addressList;
     private List<MainPolicyRide> rideList;
+    private List<CodeDescription> addressTypes;
+    private List<CodeDescription> acceptanceStatuses;
     private List<CodeDescription> changeItems;
 }

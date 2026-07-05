@@ -28,6 +28,10 @@ public interface PolicyChangeMapper {
 
     List<CodeDescription> findCodes(@Param("codeGroup") String codeGroup, @Param("codeField") String codeField);
 
+    CodeDescription findCode(@Param("codeGroup") String codeGroup,
+                             @Param("codeField") String codeField,
+                             @Param("codeBefore") String codeBefore);
+
     int existsChangeCaseNo(@Param("changeCaseNo") String changeCaseNo);
 
     String findMaxChangeCaseNoByPrefix(@Param("changeCaseNoPrefix") String changeCaseNoPrefix);
@@ -100,4 +104,12 @@ public interface PolicyChangeMapper {
                          @Param("policySeq") Integer policySeq,
                          @Param("rideOrder") String rideOrder,
                          @Param("insuredAmount") String insuredAmount);
+
+    int updateRidePremium(@Param("policyNo") String policyNo,
+                          @Param("policySeq") Integer policySeq,
+                          @Param("rideOrder") String rideOrder,
+                          @Param("premium") String premium);
+
+    int updateMasterTotalPremiumFromRides(@Param("policyNo") String policyNo,
+                                          @Param("policySeq") Integer policySeq);
 }

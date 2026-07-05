@@ -48,13 +48,16 @@
 
 ## 主要 API
 
-- `GET /api/policies/{policyNo}/{policySeq}`：查詢保單主檔、通訊地址、全部地址資料、附約資料與變更項目代碼。
-- `POST /api/change-cases`：只產生變更案號。狀態為 `P`，但尚未寫入受理資料，需等真的有異動資料時才存檔。
-- `POST /api/change-cases/address-change`：儲存 `001` 地址變更欄位與變更前後快照。
-- `POST /api/change-cases/main-amount-change`：儲存 `002` 主約保額變更。
-- `POST /api/change-cases/rider-amount-change`：儲存 `003` 附約保額變更。
-- `GET /api/policies/{policyNo}/change-cases`：依保單號碼查詢保全受理資料。
-- `PATCH /api/change-cases/{changeCaseNo}/status`：覆核動作。只有這支 API 可以將 `P` 改為 `S` 或 `C`。
+| API | 對應畫面 | 用途 |
+| --- | --- | --- |
+| `GET /api/policies/{policyNo}/{policySeq}` | 新增保全變更頁 | 查詢保單主檔、通訊地址、全部地址資料、主附約資料與變更項目代碼。 |
+| `GET /api/postal-codes/{postalCode}` | 新增保全變更頁的地址變更 Dialog | 依郵遞區號前三碼或 3+3 郵遞區號取得中文全型地址前綴與英文半形地址前綴。 |
+| `POST /api/change-cases` | 新增保全變更頁的產生案號按鈕 | 只產生變更案號。狀態為 `P`，但尚未寫入受理資料，需等真的有異動資料時才存檔。 |
+| `POST /api/change-cases/address-change` | 新增保全變更頁的 `001` 地址變更 Dialog | 儲存地址變更欄位與變更前後快照。 |
+| `POST /api/change-cases/main-amount-change` | 新增保全變更頁的 `002` 主約保額變更 Dialog | 儲存主約保額變更。 |
+| `POST /api/change-cases/rider-amount-change` | 新增保全變更頁的 `003` 附約保額變更 Dialog | 儲存附約保額變更。 |
+| `GET /api/policies/{policyNo}/change-cases` | 查詢保全變更頁與覆核頁 | 依保單號碼查詢保全受理資料。 |
+| `PATCH /api/change-cases/{changeCaseNo}/status` | 覆核頁 | 覆核動作。只有這支 API 可以將 `P` 改為 `S` 或 `C`。 |
 
 ## 商業規則
 
@@ -91,6 +94,11 @@ C1150629001
 
 - 使用 `main_policy_address`。
 - 前端可顯示該保單關聯的所有地址資料，不限定固定三筆。
+- 郵遞區號前三碼必填，後三碼可空白或 `NULL`；若後三碼有填寫，需滿 3 碼。
+- `code_description` 的 `postal-code / zip_code3`：
+  - `code_after` 存中文縣市區，例如 `臺北市|中正區`。
+  - `code_description` 存英文地址前綴，例如 `Zhongzheng Dist., Taipei City`。
+- 郵遞區號變更會帶入中文全型地址前綴與英文半形地址前綴，使用者需重新補完整地址。
 - 後端將異動欄位寫入 `policy_change_field`。
 - 後端將地址變更前後快照寫入 `policy_change_file`。
 - `policy_change_field.change_key` 存放 `address_type`。
@@ -109,6 +117,12 @@ C1150629001
 - 不可變更主約列。
 - `ride_type = 1` 或 `ride_order = 000` 視為主約列。
 - `policy_change_field.change_key` 存放 `ride_order`，避免回寫到錯誤附約。
+
+### 總保費
+
+- 保單主檔的 `premium` 視為總保費，畫面不可直接修改。
+- 主附約檔 `main_policy_ride.premium` 若在覆核完成時有異動，後端需將同一保單序號下全部 `main_policy_ride.premium` 加總回寫到 `main_policy_master.premium`。
+- 一般主檔欄位回寫不可直接更新 `premium`。
 
 ## 資料表
 

@@ -9,10 +9,12 @@ import com.alin.lin.dto.MainAmountChangeDto;
 import com.alin.lin.dto.MainAmountChangeRequest;
 import com.alin.lin.dto.PolicyChangeCaseDto;
 import com.alin.lin.dto.PolicyDetailDto;
+import com.alin.lin.dto.PostalCodeAreaDto;
 import com.alin.lin.dto.RideAmountChangeRequest;
 import com.alin.lin.dto.RiderAmountChangeListRequest;
 import com.alin.lin.dto.UpdateChangeCaseStatusDto;
 import com.alin.lin.dto.UpdateChangeCaseStatusRequest;
+import com.alin.lin.entity.CodeDescription;
 import com.alin.lin.entity.MainPolicyAddress;
 import com.alin.lin.entity.MainPolicyMaster;
 import com.alin.lin.entity.MainPolicyRide;
@@ -42,19 +44,22 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
     private static final String ADDRESS_CHANGE_ITEM = "001";
     private static final String MAIN_AMOUNT_CHANGE_ITEM = "002";
     private static final String RIDER_AMOUNT_CHANGE_ITEM = "003";
+    private static final String POSTAL_CODE_GROUP = "postal-code";
+    private static final String ZIP_CODE3_FIELD = "zip_code3";
     private static final String MASTER_AMOUNT_FIELD = "main_policy_master.insured_amount";
     private static final String MAIN_RIDE_ORDER = "000";
     private static final String MAIN_RIDE_TYPE = "1";
     private static final String RIDE_AMOUNT_FIELD_PREFIX = "main_policy_ride.";
     private static final String RIDE_AMOUNT_FIELD_SUFFIX = ".insured_amount";
+    private static final String RIDE_PREMIUM_FIELD_SUFFIX = ".premium";
     private static final String ACCEPTANCE_COMPLETE = "S";
     private static final String ACCEPTANCE_CANCEL = "C";
     private static final String ACCEPTANCE_PENDING = "P";
+    private static final String ZIP_CODE_PATTERN = "\\d{3}";
     private static final Set<String> MASTER_CHANGE_FIELDS = Set.of(
             "main_product_code",
             "main_policy_years",
-            "insured_amount",
-            "premium"
+            "insured_amount"
     );
     private static final int SERIAL_MAX = 999;
     private static final ZoneId TAIPEI_ZONE = ZoneId.of("Asia/Taipei");
@@ -84,7 +89,34 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
                 .communicationAddress(communicationAddress)
                 .addressList(addressList)
                 .rideList(rideList)
+                .addressTypes(policyChangeDao.findCodes("main-policy-address", "address_type"))
+                .acceptanceStatuses(policyChangeDao.findCodes("policy-change-acceptance", "acceptance_status"))
                 .changeItems(policyChangeDao.findCodes("policy-change-item", "change_item"))
+                .build();
+    }
+
+    @Override
+    public PostalCodeAreaDto findPostalCodeArea(String postalCode) {
+        requireText(postalCode, "postalCode");
+        String normalizedPostalCode = postalCode.trim();
+        if (!normalizedPostalCode.matches("\\d{3}(\\d{3})?")) {
+            throw new IllegalArgumentException("郵遞區號前三碼必填，後三碼可空白；若填寫需為 3 碼");
+        }
+
+        String zipCode3 = normalizedPostalCode.substring(0, 3);
+        CodeDescription code = policyChangeDao.findCode(POSTAL_CODE_GROUP, ZIP_CODE3_FIELD, zipCode3);
+        if (code == null) {
+            throw new NoSuchElementException("找不到郵遞區號前三碼: " + zipCode3);
+        }
+
+        String[] cityAndDistrict = parseCityAndDistrict(code);
+        return PostalCodeAreaDto.builder()
+                .postalCode(normalizedPostalCode)
+                .zipCode3(zipCode3)
+                .city(cityAndDistrict[0])
+                .district(cityAndDistrict[1])
+                .addressPrefix(String.join("", cityAndDistrict))
+                .halfWidthAddressPrefix(code.getCodeDescription())
                 .build();
     }
 
@@ -119,12 +151,16 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
             throw new NoSuchElementException("找不到地址資料: " + request.getPolicyNo() + "-" + request.getPolicySeq() + "-" + addressType);
         }
 
+        String zipCode3 = normalizeBlank(request.getZipCode3());
+        String zipCode2 = normalizeBlank(request.getZipCode2());
+        validateAddressPostalCode(zipCode3, zipCode2);
+
         MainPolicyAddress afterAddress = MainPolicyAddress.builder()
                 .policyNo(request.getPolicyNo())
                 .policySeq(request.getPolicySeq())
                 .addressType(addressType)
-                .zipCode3(normalizeBlank(request.getZipCode3()))
-                .zipCode2(normalizeBlank(request.getZipCode2()))
+                .zipCode3(zipCode3)
+                .zipCode2(zipCode2)
                 .fullWidthAddress(normalizeBlank(request.getFullWidthAddress()))
                 .halfWidthAddress(normalizeBlank(request.getHalfWidthAddress()))
                 .build();
@@ -314,19 +350,26 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
         List<String> changeItems = policyChangeDao.findChangeItemsByCaseNo(policyNo, policySeq, changeCaseNo);
         int appliedItemCount = 0;
         for (String changeItem : changeItems) {
+            boolean premiumTotalShouldRefresh = false;
             if (ADDRESS_CHANGE_ITEM.equals(changeItem)) {
                 applyAddressChanges(policyNo, policySeq, changeCaseNo, changeItem);
                 appliedItemCount++;
                 continue;
             }
             if (MAIN_AMOUNT_CHANGE_ITEM.equals(changeItem)) {
-                applyMainAmountChanges(policyNo, policySeq, changeCaseNo, changeItem);
+                premiumTotalShouldRefresh = applyMainAmountChanges(policyNo, policySeq, changeCaseNo, changeItem);
                 appliedItemCount++;
+                if (premiumTotalShouldRefresh) {
+                    policyChangeDao.updateMasterTotalPremiumFromRides(policyNo, policySeq);
+                }
                 continue;
             }
             if (RIDER_AMOUNT_CHANGE_ITEM.equals(changeItem)) {
-                applyRiderAmountChanges(policyNo, policySeq, changeCaseNo, changeItem);
+                premiumTotalShouldRefresh = applyRiderAmountChanges(policyNo, policySeq, changeCaseNo, changeItem);
                 appliedItemCount++;
+                if (premiumTotalShouldRefresh) {
+                    policyChangeDao.updateMasterTotalPremiumFromRides(policyNo, policySeq);
+                }
                 continue;
             }
             applyMasterChanges(policyNo, policySeq, changeCaseNo, changeItem);
@@ -359,11 +402,12 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
         }
     }
 
-    private void applyMainAmountChanges(String policyNo, Integer policySeq, String changeCaseNo, String changeItem) {
+    private boolean applyMainAmountChanges(String policyNo, Integer policySeq, String changeCaseNo, String changeItem) {
         List<PolicyChangeField> changeFields = policyChangeDao.findChangeFieldsByItem(policyNo, policySeq, changeCaseNo, changeItem);
         if (changeFields.isEmpty()) {
             throw new IllegalStateException("找不到主保額變更欄位: " + changeCaseNo);
         }
+        boolean premiumChanged = false;
         for (PolicyChangeField changeField : changeFields) {
             if (MASTER_AMOUNT_FIELD.equals(changeField.getChangeField())) {
                 policyChangeDao.updateMasterField(policyNo, policySeq, "insured_amount", changeField.getContentAfter());
@@ -378,15 +422,27 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
                 policyChangeDao.updateRideAmount(policyNo, policySeq, rideOrder, changeField.getContentAfter());
                 continue;
             }
+            if (changeField.getChangeField().startsWith(RIDE_AMOUNT_FIELD_PREFIX)
+                    && changeField.getChangeField().endsWith(RIDE_PREMIUM_FIELD_SUFFIX)) {
+                String rideOrder = resolveRideOrder(changeField, RIDE_PREMIUM_FIELD_SUFFIX);
+                if (!MAIN_RIDE_ORDER.equals(rideOrder)) {
+                    throw new IllegalArgumentException("002 主約變更不可回寫附約保費: " + rideOrder);
+                }
+                policyChangeDao.updateRidePremium(policyNo, policySeq, rideOrder, changeField.getContentAfter());
+                premiumChanged = true;
+                continue;
+            }
             throw new IllegalArgumentException("不支援回寫主約保額欄位: " + changeField.getChangeField());
         }
+        return premiumChanged;
     }
 
-    private void applyRiderAmountChanges(String policyNo, Integer policySeq, String changeCaseNo, String changeItem) {
+    private boolean applyRiderAmountChanges(String policyNo, Integer policySeq, String changeCaseNo, String changeItem) {
         List<PolicyChangeField> changeFields = policyChangeDao.findChangeFieldsByItem(policyNo, policySeq, changeCaseNo, changeItem);
         if (changeFields.isEmpty()) {
             throw new IllegalStateException("找不到附約保額變更欄位: " + changeCaseNo);
         }
+        boolean premiumChanged = false;
         for (PolicyChangeField changeField : changeFields) {
             if (changeField.getChangeField().startsWith(RIDE_AMOUNT_FIELD_PREFIX)
                     && changeField.getChangeField().endsWith(RIDE_AMOUNT_FIELD_SUFFIX)) {
@@ -397,8 +453,19 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
                 policyChangeDao.updateRideAmount(policyNo, policySeq, rideOrder, changeField.getContentAfter());
                 continue;
             }
+            if (changeField.getChangeField().startsWith(RIDE_AMOUNT_FIELD_PREFIX)
+                    && changeField.getChangeField().endsWith(RIDE_PREMIUM_FIELD_SUFFIX)) {
+                String rideOrder = resolveRideOrder(changeField, RIDE_PREMIUM_FIELD_SUFFIX);
+                if (MAIN_RIDE_ORDER.equals(rideOrder)) {
+                    throw new IllegalArgumentException("003 附約變更不可回寫主約保費");
+                }
+                policyChangeDao.updateRidePremium(policyNo, policySeq, rideOrder, changeField.getContentAfter());
+                premiumChanged = true;
+                continue;
+            }
             throw new IllegalArgumentException("不支援回寫附約保額欄位: " + changeField.getChangeField());
         }
+        return premiumChanged;
     }
 
     private String normalizeStatus(String acceptanceStatus) {
@@ -442,6 +509,21 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
         }
     }
 
+    private String[] parseCityAndDistrict(CodeDescription code) {
+        String source = code.getCodeAfter() == null || code.getCodeAfter().isBlank()
+                ? code.getCodeDescription()
+                : code.getCodeAfter();
+        String[] parts = source.split("\\|", 2);
+        if (parts.length == 2) {
+            return parts;
+        }
+        String description = code.getCodeDescription();
+        if (description.length() < 4) {
+            return new String[]{description, ""};
+        }
+        return new String[]{description.substring(0, 3), description.substring(3)};
+    }
+
     private List<FieldChange> collectFieldChanges(MainPolicyAddress beforeAddress, MainPolicyAddress afterAddress) {
         List<FieldChange> fieldChanges = new ArrayList<>();
         addFieldChangeIfDifferent(fieldChanges, "zip_code3", beforeAddress.getAddressType(), beforeAddress.getZipCode3(), afterAddress.getZipCode3());
@@ -473,6 +555,15 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
         return value == null || value.isBlank() ? null : value;
     }
 
+    private void validateAddressPostalCode(String zipCode3, String zipCode2) {
+        if (zipCode3 == null || !zipCode3.matches(ZIP_CODE_PATTERN) || (zipCode2 != null && !zipCode2.matches(ZIP_CODE_PATTERN))) {
+            throw new IllegalArgumentException("郵遞區號前三碼必填，後三碼可空白；若填寫需為 3 碼");
+        }
+        if (policyChangeDao.findCode(POSTAL_CODE_GROUP, ZIP_CODE3_FIELD, zipCode3) == null) {
+            throw new NoSuchElementException("找不到郵遞區號前三碼: " + zipCode3);
+        }
+    }
+
     private void insertFieldChange(AddressChangeRequest request, FieldChange fieldChange) {
         insertFieldChange(
                 request.getPolicyNo(),
@@ -497,11 +588,15 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
     }
 
     private String resolveRideOrder(PolicyChangeField changeField) {
+        return resolveRideOrder(changeField, RIDE_AMOUNT_FIELD_SUFFIX);
+    }
+
+    private String resolveRideOrder(PolicyChangeField changeField, String fieldSuffix) {
         if (changeField.getChangeKey() != null && !changeField.getChangeKey().isBlank()) {
             return changeField.getChangeKey();
         }
         return changeField.getChangeField()
-                .substring(RIDE_AMOUNT_FIELD_PREFIX.length(), changeField.getChangeField().length() - RIDE_AMOUNT_FIELD_SUFFIX.length());
+                .substring(RIDE_AMOUNT_FIELD_PREFIX.length(), changeField.getChangeField().length() - fieldSuffix.length());
     }
 
     private Map<String, Object> addressSnapshot(MainPolicyAddress address) {

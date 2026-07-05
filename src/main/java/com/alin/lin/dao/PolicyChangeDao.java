@@ -40,6 +40,10 @@ public class PolicyChangeDao {
         return policyChangeMapper.findCodes(codeGroup, codeField);
     }
 
+    public CodeDescription findCode(String codeGroup, String codeField, String codeBefore) {
+        return policyChangeMapper.findCode(codeGroup, codeField, codeBefore);
+    }
+
     public boolean existsChangeCaseNo(String changeCaseNo) {
         return policyChangeMapper.existsChangeCaseNo(changeCaseNo) > 0;
     }
@@ -102,5 +106,13 @@ public class PolicyChangeDao {
 
     public void updateRideAmount(String policyNo, Integer policySeq, String rideOrder, String insuredAmount) {
         policyChangeMapper.updateRideAmount(policyNo, policySeq, rideOrder, insuredAmount);
+    }
+
+    public void updateRidePremium(String policyNo, Integer policySeq, String rideOrder, String premium) {
+        policyChangeMapper.updateRidePremium(policyNo, policySeq, rideOrder, premium);
+    }
+
+    public void updateMasterTotalPremiumFromRides(String policyNo, Integer policySeq) {
+        policyChangeMapper.updateMasterTotalPremiumFromRides(policyNo, policySeq);
     }
 }

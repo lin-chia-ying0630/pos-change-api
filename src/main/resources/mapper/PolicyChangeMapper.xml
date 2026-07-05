@@ -3,36 +3,6 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.alin.lin.mapper.PolicyChangeMapper">
-    <resultMap id="MainPolicyMasterResultMap" type="com.alin.lin.entity.MainPolicyMaster">
-        <id property="policyNo" column="policy_no"/>
-        <id property="policySeq" column="policy_seq"/>
-        <result property="mainProductCode" column="main_product_code"/>
-        <result property="mainPolicyYears" column="main_policy_years"/>
-        <result property="insuredAmount" column="insured_amount"/>
-        <result property="premium" column="premium"/>
-    </resultMap>
-
-    <resultMap id="MainPolicyAddressResultMap" type="com.alin.lin.entity.MainPolicyAddress">
-        <id property="policyNo" column="policy_no"/>
-        <id property="policySeq" column="policy_seq"/>
-        <id property="addressType" column="address_type"/>
-        <result property="zipCode3" column="zip_code3"/>
-        <result property="zipCode2" column="zip_code2"/>
-        <result property="fullWidthAddress" column="full_width_address"/>
-        <result property="halfWidthAddress" column="half_width_address"/>
-    </resultMap>
-
-    <resultMap id="MainPolicyRideResultMap" type="com.alin.lin.entity.MainPolicyRide">
-        <id property="policyNo" column="policy_no"/>
-        <id property="policySeq" column="policy_seq"/>
-        <id property="rideOrder" column="ride_order"/>
-        <result property="rideType" column="ride_type"/>
-        <result property="productCode" column="product_code"/>
-        <result property="policyYears" column="policy_years"/>
-        <result property="insuredAmount" column="insured_amount"/>
-        <result property="premium" column="premium"/>
-    </resultMap>
-
     <resultMap id="CodeDescriptionResultMap" type="com.alin.lin.entity.CodeDescription">
         <id property="codeGroup" column="code_group"/>
         <id property="codeField" column="code_field"/>
@@ -46,6 +16,7 @@
         <id property="policySeq" column="policy_seq"/>
         <id property="changeCaseNo" column="change_case_no"/>
         <result property="acceptanceStatus" column="acceptance_status"/>
+        <result property="acceptanceStatusDescription" column="acceptance_status_description"/>
         <result property="changeItems" column="change_items"/>
         <result property="changeItemDescriptions" column="change_item_descriptions"/>
     </resultMap>
@@ -73,55 +44,31 @@
         <result property="contentAfter" column="content_after"/>
     </resultMap>
 
-    <select id="findMaster" resultMap="MainPolicyMasterResultMap">
-        SELECT policy_no,
-               policy_seq,
-               main_product_code,
-               main_policy_years,
-               insured_amount,
-               premium
+    <select id="findMaster" resultType="com.alin.lin.entity.MainPolicyMaster">
+        SELECT *
         FROM main_policy_master
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
     </select>
 
-    <select id="findAddress" resultMap="MainPolicyAddressResultMap">
-        SELECT policy_no,
-               policy_seq,
-               address_type,
-               zip_code3,
-               zip_code2,
-               full_width_address,
-               half_width_address
+    <select id="findAddress" resultType="com.alin.lin.entity.MainPolicyAddress">
+        SELECT *
         FROM main_policy_address
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
           AND address_type = #{addressType}
     </select>
 
-    <select id="findAddresses" resultMap="MainPolicyAddressResultMap">
-        SELECT policy_no,
-               policy_seq,
-               address_type,
-               zip_code3,
-               zip_code2,
-               full_width_address,
-               half_width_address
+    <select id="findAddresses" resultType="com.alin.lin.entity.MainPolicyAddress">
+        SELECT *
         FROM main_policy_address
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
         ORDER BY address_type
     </select>
 
-    <select id="findRides" resultMap="MainPolicyRideResultMap">
-        SELECT policy_no,
-               policy_seq,
-               ride_type,
-               ride_order,
-               product_code,
-               policy_years,
-               insured_amount,
-               premium
+    <select id="findRides" resultType="com.alin.lin.entity.MainPolicyRide">
+        SELECT *
         FROM main_policy_ride
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
@@ -138,6 +85,18 @@
         WHERE code_group = #{codeGroup}
           AND code_field = #{codeField}
         ORDER BY code_before
+    </select>
+
+    <select id="findCode" resultMap="CodeDescriptionResultMap">
+        SELECT code_group,
+               code_field,
+               code_before,
+               code_after,
+               code_description
+        FROM code_description
+        WHERE code_group = #{codeGroup}
+          AND code_field = #{codeField}
+          AND code_before = #{codeBefore}
     </select>
 
     <select id="existsChangeCaseNo" resultType="int">
@@ -157,9 +116,14 @@
                a.policy_seq,
                a.change_case_no,
                a.acceptance_status,
+               COALESCE(status_cd.code_description, a.acceptance_status) AS acceptance_status_description,
                GROUP_CONCAT(i.change_item ORDER BY i.change_item SEPARATOR ',') AS change_items,
                GROUP_CONCAT(COALESCE(cd.code_description, i.change_item) ORDER BY i.change_item SEPARATOR ',') AS change_item_descriptions
         FROM policy_change_acceptance a
+        LEFT JOIN code_description status_cd
+          ON status_cd.code_group = 'policy-change-acceptance'
+         AND status_cd.code_field = 'acceptance_status'
+         AND status_cd.code_before = a.acceptance_status
         LEFT JOIN policy_change_item i
           ON i.policy_no = a.policy_no
          AND i.policy_seq = a.policy_seq
@@ -169,7 +133,7 @@
          AND cd.code_field = 'change_item'
          AND cd.code_before = i.change_item
         WHERE a.policy_no = #{policyNo}
-        GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status, a.created_at
+        GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status, status_cd.code_description, a.created_at
         ORDER BY a.created_at DESC
     </select>
 
@@ -178,9 +142,14 @@
                a.policy_seq,
                a.change_case_no,
                a.acceptance_status,
+               COALESCE(status_cd.code_description, a.acceptance_status) AS acceptance_status_description,
                GROUP_CONCAT(i.change_item ORDER BY i.change_item SEPARATOR ',') AS change_items,
                GROUP_CONCAT(COALESCE(cd.code_description, i.change_item) ORDER BY i.change_item SEPARATOR ',') AS change_item_descriptions
         FROM policy_change_acceptance a
+        LEFT JOIN code_description status_cd
+          ON status_cd.code_group = 'policy-change-acceptance'
+         AND status_cd.code_field = 'acceptance_status'
+         AND status_cd.code_before = a.acceptance_status
         LEFT JOIN policy_change_item i
           ON i.policy_no = a.policy_no
          AND i.policy_seq = a.policy_seq
@@ -192,7 +161,7 @@
         WHERE a.policy_no = #{policyNo}
           AND a.policy_seq = #{policySeq}
           AND a.change_case_no = #{changeCaseNo}
-        GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status
+        GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status, status_cd.code_description
     </select>
 
     <select id="findChangeItemsByCaseNo" resultType="string">
@@ -341,5 +310,25 @@
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
           AND ride_order = #{rideOrder}
+    </update>
+
+    <update id="updateRidePremium">
+        UPDATE main_policy_ride
+        SET premium = CAST(#{premium} AS DECIMAL(17, 4))
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND ride_order = #{rideOrder}
+    </update>
+
+    <update id="updateMasterTotalPremiumFromRides">
+        UPDATE main_policy_master
+        SET premium = (
+            SELECT COALESCE(SUM(ride.premium), 0)
+            FROM main_policy_ride ride
+            WHERE ride.policy_no = #{policyNo}
+              AND ride.policy_seq = #{policySeq}
+        )
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
     </update>
 </mapper>

@@ -14,6 +14,7 @@ public class PolicyChangeCaseDto {
     private Integer policySeq;
     private String changeCaseNo;
     private String acceptanceStatus;
+    private String acceptanceStatusDescription;
     private String changeItems;
     private String changeItemDescriptions;
 }

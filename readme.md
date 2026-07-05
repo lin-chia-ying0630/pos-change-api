@@ -78,6 +78,7 @@ DTO 是 API 或 Service 層使用的資料模型。
 - `AddressChangeDto`
 - `MainAmountChangeDto`
 - `PolicyChangeCaseDto`
+- `PostalCodeAreaDto`
 - `UpdateChangeCaseStatusDto`
 
 Request DTO：
@@ -146,6 +147,24 @@ DTO 與 Entity 應使用 Lombok 讓程式碼簡潔：
 - 附約保額變更 `003`：`change_key = ride_order`。
 
 這可以避免把儲存的變更套用到錯誤地址或錯誤附約保額。
+
+## API 與畫面註解
+
+Controller 的每一支 API 方法上方都應保留簡短註解，標示該 API 對應的前端畫面或 Dialog，例如：
+
+- 新增保全變更頁。
+- 地址變更 Dialog。
+- 查詢保全變更頁。
+- 覆核頁。
+
+註解重點是畫面對應與使用時機，不需要描述每一行程式做什麼。
+
+## 地址與總保費命名
+
+- `PostalCodeAreaDto.addressPrefix`：中文全型地址前綴。
+- `PostalCodeAreaDto.halfWidthAddressPrefix`：英文半形地址前綴，來源為 `code_description.code_description`。
+- `main_policy_master.premium`：總保費，不是可直接手動修改的主檔保費。
+- `main_policy_ride.premium`：主附約各列保費，總保費由這些資料列加總回寫。
 
 ## 變更項目命名
 
