@@ -12,14 +12,33 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PolicyChangeField {
+    // 流水識別碼
     private Long id;
+
+    // 保單號碼
     private String policyNo;
+
+    // 保單序號
     private Integer policySeq;
+
+    // 保全變更案號
     private String changeCaseNo;
+
+    // 保全變更項目
     private String changeItem;
+
+    // 異動欄位
     private String changeField;
+
+    // 異動目標鍵值
     private String changeKey;
+
+    // 異動前內容
     private String contentBefore;
+
+    // 異動後內容
     private String contentAfter;
+
+    // 建立時間
     private LocalDateTime createdAt;
 }

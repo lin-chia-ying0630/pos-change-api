@@ -30,8 +30,6 @@
 - `PolicyChangeServiceImpl`
 - `PolicyChangeDao`
 - `PolicyChangeDaoImpl`
-- `PosChangeDao`
-- `PosChangeDaoImpl`
 - `PolicyChangeMapper`
 - `PolicyChangeMapper.xml`
 
@@ -47,6 +45,7 @@ DTO 使用規則：
 - `@RequestBody` 不直接使用 Entity，需建立 request DTO。
 - API 回覆 data 若是一對一對應單一 SQL table row，可以直接使用 Entity。
 - 每一張 SQL table 都應有一個對應 Entity。
+- Entity 欄位應補中文註解，說明欄位業務意義。
 
 重要範例：
 

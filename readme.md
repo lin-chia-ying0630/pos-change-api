@@ -42,8 +42,6 @@ DAO 是資料存取物件，不是 request 或 response payload。
 
 - `PolicyChangeDao`
 - `PolicyChangeDaoImpl`
-- `PosChangeDao`
-- `PosChangeDaoImpl`
 
 DAO 建議使用介面與實作分離。Service 依賴 DAO interface，DAO implementation 再呼叫 Mapper 方法，讓 Service 不直接碰 SQL 存取細節。
 
@@ -70,6 +68,8 @@ Entity 對應資料表資料列。
 - `PolicyChangeField`
 - `PolicyChangeFile`
 - `CodeDescription`
+
+Entity 欄位應補上中文註解，方便對照 SQL 欄位與畫面欄位。
 
 ## DTO 命名
 
@@ -99,7 +99,6 @@ Request body 一律使用 `*Request` DTO：
 - 主約保額變更：案號使用 path variable，Body 使用 `MainAmountChangeRequest`。
 - 附約保額變更：案號、保單號碼、序號使用 path variable，Body 使用 `RiderAmountChangeListRequest`。
 - 覆核狀態：案號使用 path variable，Body 使用 `UpdateChangeCaseStatusRequest`。
-- POS change CRUD：Body 使用 `PosChangeRequest`。
 
 回覆外層：
 
@@ -134,9 +133,7 @@ DAO 與 DTO 職責不同：
 - `PolicyChangeDao` 是 DAO interface。
 - `PolicyChangeDaoImpl` 是 DAO implementation，注入 `PolicyChangeMapper`。
 - `PolicyChangeMapper` 是 MyBatis mapper，由 MyBatis 產生代理實作，不手動 `implements` DAO。
-- `PosChangeDao` / `PosChangeDaoImpl` 也遵守相同分工。
 - `MainPolicyMaster` 是 Entity，因為它對應資料表資料列。
-- `PosChangeRequest` 是 request DTO，對應 POS change CRUD 的 request body。
 
 ## Lombok 標準
 
