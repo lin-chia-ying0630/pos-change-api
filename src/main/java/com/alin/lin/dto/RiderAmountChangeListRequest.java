@@ -12,8 +12,5 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RiderAmountChangeListRequest {
-    private String policyNo;
-    private Integer policySeq;
-    private String changeCaseNo;
     private List<RideAmountChangeRequest> rides;
 }

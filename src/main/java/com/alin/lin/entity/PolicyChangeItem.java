@@ -5,22 +5,16 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Builder
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class MainPolicyRide {
+public class PolicyChangeItem {
     private String policyNo;
     private Integer policySeq;
-    private String rideType;
-    private String rideOrder;
-    private String productCode;
-    private Integer policyYears;
-    private BigDecimal insuredAmount;
-    private BigDecimal premium;
+    private String changeCaseNo;
+    private String changeItem;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 }

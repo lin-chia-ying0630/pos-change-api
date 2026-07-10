@@ -22,11 +22,11 @@ public interface PolicyChangeService {
 
     CreateChangeCaseDto createChangeCase(CreateChangeCaseRequest request);
 
-    AddressChangeDto saveAddressChange(AddressChangeRequest request);
+    AddressChangeDto saveAddressChange(String changeCaseNo, AddressChangeRequest request);
 
-    MainAmountChangeDto saveMainAmountChange(MainAmountChangeRequest request);
+    MainAmountChangeDto saveMainAmountChange(String changeCaseNo, MainAmountChangeRequest request);
 
-    MainAmountChangeDto saveRiderAmountChange(RiderAmountChangeListRequest request);
+    MainAmountChangeDto saveRiderAmountChange(String changeCaseNo, String policyNo, Integer policySeq, RiderAmountChangeListRequest request);
 
     List<PolicyChangeCaseDto> findChangeCases(String policyNo);
 

@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Builder
 @Data
 @NoArgsConstructor
@@ -19,4 +21,5 @@ public class PolicyChangeField {
     private String changeKey;
     private String contentBefore;
     private String contentAfter;
+    private LocalDateTime createdAt;
 }

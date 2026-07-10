@@ -20,7 +20,8 @@
 
 - Controller：接收 HTTP 請求，並統一回傳 `ResponseBodyDto<T>`。
 - Service 介面與實作：處理商業規則與交易控制。
-- DAO / Mapper：封裝 MyBatis 呼叫與 SQL 存取。
+- DAO 介面與實作：Service 依賴 DAO interface，DAO implementation 封裝資料存取。
+- Mapper：MyBatis mapper 介面，搭配 XML SQL，由 MyBatis 產生代理實作，不手動 `implements` DAO。
 
 主要流程類別：
 
@@ -28,6 +29,9 @@
 - `PolicyChangeService`
 - `PolicyChangeServiceImpl`
 - `PolicyChangeDao`
+- `PolicyChangeDaoImpl`
+- `PosChangeDao`
+- `PosChangeDaoImpl`
 - `PolicyChangeMapper`
 - `PolicyChangeMapper.xml`
 
@@ -35,7 +39,14 @@
 
 所有 API 回覆都應透過 `ResponseUtil` 包成 `ResponseBodyDto<T>`。
 
-傳入的 request body 使用一般 Request DTO，不需要包 `ResponseBodyDto`。
+傳入的 request body 不需要包 `ResponseBodyDto`。
+
+DTO 使用規則：
+
+- 除非是 join 其他欄位、畫面聚合資料、計算結果或操作結果，否則不新增 DTO。
+- `@RequestBody` 不直接使用 Entity，需建立 request DTO。
+- API 回覆 data 若是一對一對應單一 SQL table row，可以直接使用 Entity。
+- 每一張 SQL table 都應有一個對應 Entity。
 
 重要範例：
 
@@ -53,9 +64,9 @@
 | `GET /api/policies/{policyNo}/{policySeq}` | 新增保全變更頁 | 查詢保單主檔、通訊地址、全部地址資料、主附約資料與變更項目代碼。 |
 | `GET /api/postal-codes/{postalCode}` | 新增保全變更頁的地址變更 Dialog | 依郵遞區號前三碼或 3+3 郵遞區號取得中文全型地址前綴與英文半形地址前綴。 |
 | `POST /api/change-cases` | 新增保全變更頁的產生案號按鈕 | 只產生變更案號。狀態為 `P`，但尚未寫入受理資料，需等真的有異動資料時才存檔。 |
-| `POST /api/change-cases/address-change` | 新增保全變更頁的 `001` 地址變更 Dialog | 儲存地址變更欄位與變更前後快照。 |
-| `POST /api/change-cases/main-amount-change` | 新增保全變更頁的 `002` 主約保額變更 Dialog | 儲存主約保額變更。 |
-| `POST /api/change-cases/rider-amount-change` | 新增保全變更頁的 `003` 附約保額變更 Dialog | 儲存附約保額變更。 |
+| `POST /api/change-cases/{changeCaseNo}/address-change` | 新增保全變更頁的 `001` 地址變更 Dialog | Body 使用 `AddressChangeRequest` 儲存地址變更欄位與變更前後快照。 |
+| `POST /api/change-cases/{changeCaseNo}/main-amount-change` | 新增保全變更頁的 `002` 主約保額變更 Dialog | Body 使用 `MainAmountChangeRequest` 儲存主約保額變更。 |
+| `POST /api/change-cases/{changeCaseNo}/policies/{policyNo}/{policySeq}/rider-amount-change` | 新增保全變更頁的 `003` 附約保額變更 Dialog | Body 使用 `RiderAmountChangeListRequest` 儲存附約保額變更。 |
 | `GET /api/policies/{policyNo}/change-cases` | 查詢保全變更頁與覆核頁 | 依保單號碼查詢保全受理資料。 |
 | `PATCH /api/change-cases/{changeCaseNo}/status` | 覆核頁 | 覆核動作。只有這支 API 可以將 `P` 改為 `S` 或 `C`。 |
 

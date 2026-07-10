@@ -6,7 +6,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Builder
 @Data
@@ -15,7 +14,5 @@ import java.util.List;
 public class MainAmountChangeRequest {
     private String policyNo;
     private Integer policySeq;
-    private String changeCaseNo;
     private BigDecimal masterInsuredAmount;
-    private List<RideAmountChangeRequest> rides;
 }

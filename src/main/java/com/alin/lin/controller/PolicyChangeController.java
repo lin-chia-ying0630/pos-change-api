@@ -1,9 +1,9 @@
 package com.alin.lin.controller;
 
-import com.alin.lin.dto.AddressChangeRequest;
 import com.alin.lin.dto.AddressChangeDto;
-import com.alin.lin.dto.CreateChangeCaseRequest;
+import com.alin.lin.dto.AddressChangeRequest;
 import com.alin.lin.dto.CreateChangeCaseDto;
+import com.alin.lin.dto.CreateChangeCaseRequest;
 import com.alin.lin.dto.MainAmountChangeDto;
 import com.alin.lin.dto.MainAmountChangeRequest;
 import com.alin.lin.dto.PolicyChangeCaseDto;
@@ -61,21 +61,32 @@ public class PolicyChangeController {
     }
 
     // 畫面對應：新增保全變更頁的 001 地址變更 Dialog 儲存。
-    @PostMapping("/change-cases/address-change")
-    public ResponseEntity<ResponseBodyDto<AddressChangeDto>> saveAddressChange(@RequestBody AddressChangeRequest request) {
-        return ResponseUtil.ok(policyChangeService.saveAddressChange(request));
+    @PostMapping("/change-cases/{changeCaseNo}/address-change")
+    public ResponseEntity<ResponseBodyDto<AddressChangeDto>> saveAddressChange(
+            @PathVariable String changeCaseNo,
+            @RequestBody AddressChangeRequest request
+    ) {
+        return ResponseUtil.ok(policyChangeService.saveAddressChange(changeCaseNo, request));
     }
 
     // 畫面對應：新增保全變更頁的 002 主約保額變更 Dialog 儲存。
-    @PostMapping("/change-cases/main-amount-change")
-    public ResponseEntity<ResponseBodyDto<MainAmountChangeDto>> saveMainAmountChange(@RequestBody MainAmountChangeRequest request) {
-        return ResponseUtil.ok(policyChangeService.saveMainAmountChange(request));
+    @PostMapping("/change-cases/{changeCaseNo}/main-amount-change")
+    public ResponseEntity<ResponseBodyDto<MainAmountChangeDto>> saveMainAmountChange(
+            @PathVariable String changeCaseNo,
+            @RequestBody MainAmountChangeRequest request
+    ) {
+        return ResponseUtil.ok(policyChangeService.saveMainAmountChange(changeCaseNo, request));
     }
 
     // 畫面對應：新增保全變更頁的 003 附約保額變更 Dialog 儲存。
-    @PostMapping("/change-cases/rider-amount-change")
-    public ResponseEntity<ResponseBodyDto<MainAmountChangeDto>> saveRiderAmountChange(@RequestBody RiderAmountChangeListRequest request) {
-        return ResponseUtil.ok(policyChangeService.saveRiderAmountChange(request));
+    @PostMapping("/change-cases/{changeCaseNo}/policies/{policyNo}/{policySeq}/rider-amount-change")
+    public ResponseEntity<ResponseBodyDto<MainAmountChangeDto>> saveRiderAmountChange(
+            @PathVariable String changeCaseNo,
+            @PathVariable String policyNo,
+            @PathVariable Integer policySeq,
+            @RequestBody RiderAmountChangeListRequest request
+    ) {
+        return ResponseUtil.ok(policyChangeService.saveRiderAmountChange(changeCaseNo, policyNo, policySeq, request));
     }
 
     // 畫面對應：查詢保全變更頁與覆核頁，依保單號碼列出既有保全受理資料。

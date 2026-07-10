@@ -1,118 +1,63 @@
 package com.alin.lin.dao;
 
+import com.alin.lin.dto.PolicyChangeCaseDto;
 import com.alin.lin.entity.CodeDescription;
 import com.alin.lin.entity.MainPolicyAddress;
 import com.alin.lin.entity.MainPolicyMaster;
 import com.alin.lin.entity.MainPolicyRide;
-import com.alin.lin.dto.PolicyChangeCaseDto;
+import com.alin.lin.entity.PolicyChangeAcceptance;
 import com.alin.lin.entity.PolicyChangeField;
 import com.alin.lin.entity.PolicyChangeFile;
-import com.alin.lin.mapper.PolicyChangeMapper;
-import org.springframework.stereotype.Repository;
+import com.alin.lin.entity.PolicyChangeItem;
 
 import java.util.List;
 
-@Repository
-public class PolicyChangeDao {
-    private final PolicyChangeMapper policyChangeMapper;
+public interface PolicyChangeDao {
+    MainPolicyMaster findMaster(String policyNo, Integer policySeq);
 
-    public PolicyChangeDao(PolicyChangeMapper policyChangeMapper) {
-        this.policyChangeMapper = policyChangeMapper;
-    }
+    MainPolicyAddress findAddress(String policyNo, Integer policySeq, String addressType);
 
-    public MainPolicyMaster findMaster(String policyNo, Integer policySeq) {
-        return policyChangeMapper.findMaster(policyNo, policySeq);
-    }
+    List<MainPolicyAddress> findAddresses(String policyNo, Integer policySeq);
 
-    public MainPolicyAddress findAddress(String policyNo, Integer policySeq, String addressType) {
-        return policyChangeMapper.findAddress(policyNo, policySeq, addressType);
-    }
+    List<MainPolicyRide> findRides(String policyNo, Integer policySeq);
 
-    public List<MainPolicyAddress> findAddresses(String policyNo, Integer policySeq) {
-        return policyChangeMapper.findAddresses(policyNo, policySeq);
-    }
+    List<CodeDescription> findCodes(String codeGroup, String codeField);
 
-    public List<MainPolicyRide> findRides(String policyNo, Integer policySeq) {
-        return policyChangeMapper.findRides(policyNo, policySeq);
-    }
+    CodeDescription findCode(String codeGroup, String codeField, String codeBefore);
 
-    public List<CodeDescription> findCodes(String codeGroup, String codeField) {
-        return policyChangeMapper.findCodes(codeGroup, codeField);
-    }
+    boolean existsChangeCaseNo(String changeCaseNo);
 
-    public CodeDescription findCode(String codeGroup, String codeField, String codeBefore) {
-        return policyChangeMapper.findCode(codeGroup, codeField, codeBefore);
-    }
+    String findMaxChangeCaseNoByPrefix(String changeCaseNoPrefix);
 
-    public boolean existsChangeCaseNo(String changeCaseNo) {
-        return policyChangeMapper.existsChangeCaseNo(changeCaseNo) > 0;
-    }
+    List<PolicyChangeCaseDto> findChangeCases(String policyNo);
 
-    public String findMaxChangeCaseNoByPrefix(String changeCaseNoPrefix) {
-        return policyChangeMapper.findMaxChangeCaseNoByPrefix(changeCaseNoPrefix);
-    }
+    PolicyChangeCaseDto findChangeCase(String policyNo, Integer policySeq, String changeCaseNo);
 
-    public List<PolicyChangeCaseDto> findChangeCases(String policyNo) {
-        return policyChangeMapper.findChangeCases(policyNo);
-    }
+    List<String> findChangeItemsByCaseNo(String policyNo, Integer policySeq, String changeCaseNo);
 
-    public PolicyChangeCaseDto findChangeCase(String policyNo, Integer policySeq, String changeCaseNo) {
-        return policyChangeMapper.findChangeCase(policyNo, policySeq, changeCaseNo);
-    }
+    List<PolicyChangeFile> findChangeFilesByItem(String policyNo, Integer policySeq, String changeCaseNo, String changeItem);
 
-    public List<String> findChangeItemsByCaseNo(String policyNo, Integer policySeq, String changeCaseNo) {
-        return policyChangeMapper.findChangeItemsByCaseNo(policyNo, policySeq, changeCaseNo);
-    }
+    List<PolicyChangeField> findChangeFieldsByItem(String policyNo, Integer policySeq, String changeCaseNo, String changeItem);
 
-    public List<PolicyChangeFile> findChangeFilesByItem(String policyNo, Integer policySeq, String changeCaseNo, String changeItem) {
-        return policyChangeMapper.findChangeFilesByItem(policyNo, policySeq, changeCaseNo, changeItem);
-    }
+    void insertAcceptance(PolicyChangeAcceptance acceptance);
 
-    public List<PolicyChangeField> findChangeFieldsByItem(String policyNo, Integer policySeq, String changeCaseNo, String changeItem) {
-        return policyChangeMapper.findChangeFieldsByItem(policyNo, policySeq, changeCaseNo, changeItem);
-    }
+    void insertChangeItem(PolicyChangeItem changeItem);
 
-    public void insertAcceptance(String policyNo, Integer policySeq, String changeCaseNo, String acceptanceStatus) {
-        policyChangeMapper.insertAcceptance(policyNo, policySeq, changeCaseNo, acceptanceStatus);
-    }
+    boolean existsChangeItem(String policyNo, Integer policySeq, String changeCaseNo, String changeItem);
 
-    public void insertChangeItem(String policyNo, Integer policySeq, String changeCaseNo, String changeItem) {
-        policyChangeMapper.insertChangeItem(policyNo, policySeq, changeCaseNo, changeItem);
-    }
+    void insertChangeField(String policyNo, Integer policySeq, String changeCaseNo, String changeItem, String changeField, String changeKey, String contentBefore, String contentAfter);
 
-    public boolean existsChangeItem(String policyNo, Integer policySeq, String changeCaseNo, String changeItem) {
-        return policyChangeMapper.existsChangeItem(policyNo, policySeq, changeCaseNo, changeItem) > 0;
-    }
+    void insertChangeFile(String policyNo, Integer policySeq, String changeCaseNo, String changeItem, String changeFile, String contentBefore, String contentAfter);
 
-    public void insertChangeField(String policyNo, Integer policySeq, String changeCaseNo, String changeItem, String changeField, String changeKey, String contentBefore, String contentAfter) {
-        policyChangeMapper.insertChangeField(policyNo, policySeq, changeCaseNo, changeItem, changeField, changeKey, contentBefore, contentAfter);
-    }
+    void updateAcceptanceStatus(PolicyChangeAcceptance acceptance);
 
-    public void insertChangeFile(String policyNo, Integer policySeq, String changeCaseNo, String changeItem, String changeFile, String contentBefore, String contentAfter) {
-        policyChangeMapper.insertChangeFile(policyNo, policySeq, changeCaseNo, changeItem, changeFile, contentBefore, contentAfter);
-    }
+    void updateAddress(MainPolicyAddress address);
 
-    public void updateAcceptanceStatus(String policyNo, Integer policySeq, String changeCaseNo, String acceptanceStatus) {
-        policyChangeMapper.updateAcceptanceStatus(policyNo, policySeq, changeCaseNo, acceptanceStatus);
-    }
+    void updateMasterField(String policyNo, Integer policySeq, String changeField, String contentAfter);
 
-    public void updateAddress(MainPolicyAddress address) {
-        policyChangeMapper.updateAddress(address);
-    }
+    void updateRideAmount(String policyNo, Integer policySeq, String rideOrder, String insuredAmount);
 
-    public void updateMasterField(String policyNo, Integer policySeq, String changeField, String contentAfter) {
-        policyChangeMapper.updateMasterField(policyNo, policySeq, changeField, contentAfter);
-    }
+    void updateRidePremium(String policyNo, Integer policySeq, String rideOrder, String premium);
 
-    public void updateRideAmount(String policyNo, Integer policySeq, String rideOrder, String insuredAmount) {
-        policyChangeMapper.updateRideAmount(policyNo, policySeq, rideOrder, insuredAmount);
-    }
-
-    public void updateRidePremium(String policyNo, Integer policySeq, String rideOrder, String premium) {
-        policyChangeMapper.updateRidePremium(policyNo, policySeq, rideOrder, premium);
-    }
-
-    public void updateMasterTotalPremiumFromRides(String policyNo, Integer policySeq) {
-        policyChangeMapper.updateMasterTotalPremiumFromRides(policyNo, policySeq);
-    }
+    void updateMasterTotalPremiumFromRides(String policyNo, Integer policySeq);
 }

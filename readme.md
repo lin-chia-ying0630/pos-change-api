@@ -5,8 +5,8 @@
 後端命名要清楚表達所在層級與用途：
 
 - Entity：資料庫資料列模型。
-- DTO：API 或 use case 的資料承載物件。
-- Request DTO：傳入 request body。
+- DTO：join 其他欄位、畫面聚合資料、計算結果或操作結果。
+- Request DTO：所有 `@RequestBody` 的傳入資料，不直接使用 Entity。
 - DAO：資料存取封裝。
 - Mapper：MyBatis SQL 介面。
 - Response envelope：只使用 `ResponseBodyDto<T>`。
@@ -41,9 +41,11 @@ DAO 是資料存取物件，不是 request 或 response payload。
 範例：
 
 - `PolicyChangeDao`
+- `PolicyChangeDaoImpl`
 - `PosChangeDao`
+- `PosChangeDaoImpl`
 
-DAO 呼叫 Mapper 方法，讓 Service 不直接碰 SQL 存取細節。
+DAO 建議使用介面與實作分離。Service 依賴 DAO interface，DAO implementation 再呼叫 Mapper 方法，讓 Service 不直接碰 SQL 存取細節。
 
 ### Mapper
 
@@ -63,6 +65,8 @@ Entity 對應資料表資料列。
 - `MainPolicyMaster`
 - `MainPolicyAddress`
 - `MainPolicyRide`
+- `PolicyChangeAcceptance`
+- `PolicyChangeItem`
 - `PolicyChangeField`
 - `PolicyChangeFile`
 - `CodeDescription`
@@ -81,15 +85,21 @@ DTO 是 API 或 Service 層使用的資料模型。
 - `PostalCodeAreaDto`
 - `UpdateChangeCaseStatusDto`
 
-Request DTO：
+DTO 原則：
 
-- `CreateChangeCaseRequest`
-- `AddressChangeRequest`
-- `MainAmountChangeRequest`
-- `RiderAmountChangeListRequest`
-- `RideAmountChangeRequest`
-- `UpdateChangeCaseStatusRequest`
-- `PosChangeRequest`
+- 除非是 join 其他欄位、畫面聚合資料、計算結果或操作結果，否則不新增 DTO。
+- `@RequestBody` 不直接使用 Entity，需建立 request DTO。
+- API 回覆 data 若是一對一對應單一 SQL table row，可以直接使用 Entity，不再包裝 DTO。
+- `ResponseBodyDto<T>` 只負責外層回覆格式，`data` 依上面規則放 Entity 或 DTO。
+
+Request body 一律使用 `*Request` DTO：
+
+- 產生案號：Body 使用 `CreateChangeCaseRequest`。
+- 地址變更：案號使用 path variable，Body 使用 `AddressChangeRequest`。
+- 主約保額變更：案號使用 path variable，Body 使用 `MainAmountChangeRequest`。
+- 附約保額變更：案號、保單號碼、序號使用 path variable，Body 使用 `RiderAmountChangeListRequest`。
+- 覆核狀態：案號使用 path variable，Body 使用 `UpdateChangeCaseStatusRequest`。
+- POS change CRUD：Body 使用 `PosChangeRequest`。
 
 回覆外層：
 
@@ -121,9 +131,12 @@ DAO 與 DTO 職責不同：
 
 範例：
 
-- `PosChangeDao` 是 DAO。
-- `PosChangeRequest` 是 DTO，因為它是 request data。
+- `PolicyChangeDao` 是 DAO interface。
+- `PolicyChangeDaoImpl` 是 DAO implementation，注入 `PolicyChangeMapper`。
+- `PolicyChangeMapper` 是 MyBatis mapper，由 MyBatis 產生代理實作，不手動 `implements` DAO。
+- `PosChangeDao` / `PosChangeDaoImpl` 也遵守相同分工。
 - `MainPolicyMaster` 是 Entity，因為它對應資料表資料列。
+- `PosChangeRequest` 是 request DTO，對應 POS change CRUD 的 request body。
 
 ## Lombok 標準
 

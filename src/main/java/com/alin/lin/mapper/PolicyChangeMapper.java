@@ -5,8 +5,10 @@ import com.alin.lin.entity.MainPolicyAddress;
 import com.alin.lin.entity.MainPolicyMaster;
 import com.alin.lin.entity.MainPolicyRide;
 import com.alin.lin.dto.PolicyChangeCaseDto;
+import com.alin.lin.entity.PolicyChangeAcceptance;
 import com.alin.lin.entity.PolicyChangeField;
 import com.alin.lin.entity.PolicyChangeFile;
+import com.alin.lin.entity.PolicyChangeItem;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -56,15 +58,9 @@ public interface PolicyChangeMapper {
                                                    @Param("changeCaseNo") String changeCaseNo,
                                                    @Param("changeItem") String changeItem);
 
-    int insertAcceptance(@Param("policyNo") String policyNo,
-                         @Param("policySeq") Integer policySeq,
-                         @Param("changeCaseNo") String changeCaseNo,
-                         @Param("acceptanceStatus") String acceptanceStatus);
+    int insertAcceptance(PolicyChangeAcceptance acceptance);
 
-    int insertChangeItem(@Param("policyNo") String policyNo,
-                         @Param("policySeq") Integer policySeq,
-                         @Param("changeCaseNo") String changeCaseNo,
-                         @Param("changeItem") String changeItem);
+    int insertChangeItem(PolicyChangeItem changeItem);
 
     int existsChangeItem(@Param("policyNo") String policyNo,
                          @Param("policySeq") Integer policySeq,
@@ -88,10 +84,7 @@ public interface PolicyChangeMapper {
                          @Param("contentBefore") String contentBefore,
                          @Param("contentAfter") String contentAfter);
 
-    int updateAcceptanceStatus(@Param("policyNo") String policyNo,
-                               @Param("policySeq") Integer policySeq,
-                               @Param("changeCaseNo") String changeCaseNo,
-                               @Param("acceptanceStatus") String acceptanceStatus);
+    int updateAcceptanceStatus(PolicyChangeAcceptance acceptance);
 
     int updateAddress(MainPolicyAddress address);
 

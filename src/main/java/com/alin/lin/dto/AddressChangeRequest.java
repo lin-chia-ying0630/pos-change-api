@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
 public class AddressChangeRequest {
     private String policyNo;
     private Integer policySeq;
-    private String changeCaseNo;
     private String addressType;
     private String zipCode3;
     private String zipCode2;

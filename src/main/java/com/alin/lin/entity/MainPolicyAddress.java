@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Builder
 @Data
 @NoArgsConstructor
@@ -17,4 +19,6 @@ public class MainPolicyAddress {
     private String zipCode2;
     private String fullWidthAddress;
     private String halfWidthAddress;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

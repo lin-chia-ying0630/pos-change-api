@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Builder
 @Data
@@ -18,4 +19,6 @@ public class MainPolicyMaster {
     private Integer mainPolicyYears;
     private BigDecimal insuredAmount;
     private BigDecimal premium;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

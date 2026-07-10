@@ -18,8 +18,10 @@ import com.alin.lin.entity.CodeDescription;
 import com.alin.lin.entity.MainPolicyAddress;
 import com.alin.lin.entity.MainPolicyMaster;
 import com.alin.lin.entity.MainPolicyRide;
+import com.alin.lin.entity.PolicyChangeAcceptance;
 import com.alin.lin.entity.PolicyChangeField;
 import com.alin.lin.entity.PolicyChangeFile;
+import com.alin.lin.entity.PolicyChangeItem;
 import com.alin.lin.service.PolicyChangeService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -138,13 +140,13 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
 
     @Override
     @Transactional
-    public AddressChangeDto saveAddressChange(AddressChangeRequest request) {
+    public AddressChangeDto saveAddressChange(String changeCaseNo, AddressChangeRequest request) {
         String addressType = request.getAddressType() == null || request.getAddressType().isBlank()
                 ? COMMUNICATION_ADDRESS
                 : request.getAddressType();
 
         requirePolicy(request.getPolicyNo(), request.getPolicySeq());
-        requireText(request.getChangeCaseNo(), "changeCaseNo");
+        requireText(changeCaseNo, "changeCaseNo");
 
         MainPolicyAddress beforeAddress = policyChangeDao.findAddress(request.getPolicyNo(), request.getPolicySeq(), addressType);
         if (beforeAddress == null) {
@@ -168,19 +170,19 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
         List<FieldChange> fieldChanges = collectFieldChanges(beforeAddress, afterAddress);
         if (fieldChanges.isEmpty()) {
             return AddressChangeDto.builder()
-                    .changeCaseNo(request.getChangeCaseNo())
+                    .changeCaseNo(changeCaseNo)
                     .changeItem(ADDRESS_CHANGE_ITEM)
                     .changedFieldCount(0)
                     .build();
         }
 
-        ensureChangeCaseSaved(request.getPolicyNo(), request.getPolicySeq(), request.getChangeCaseNo(), ADDRESS_CHANGE_ITEM);
-        fieldChanges.forEach(fieldChange -> insertFieldChange(request, fieldChange));
+        ensureChangeCaseSaved(request.getPolicyNo(), request.getPolicySeq(), changeCaseNo, ADDRESS_CHANGE_ITEM);
+        fieldChanges.forEach(fieldChange -> insertFieldChange(request, changeCaseNo, fieldChange));
 
         policyChangeDao.insertChangeFile(
                 request.getPolicyNo(),
                 request.getPolicySeq(),
-                request.getChangeCaseNo(),
+                changeCaseNo,
                 ADDRESS_CHANGE_ITEM,
                 "main_policy_address",
                 toJson(addressSnapshot(beforeAddress)),
@@ -188,7 +190,7 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
         );
 
         return AddressChangeDto.builder()
-                .changeCaseNo(request.getChangeCaseNo())
+                .changeCaseNo(changeCaseNo)
                 .changeItem(ADDRESS_CHANGE_ITEM)
                 .changedFieldCount(fieldChanges.size())
                 .build();
@@ -196,9 +198,9 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
 
     @Override
     @Transactional
-    public MainAmountChangeDto saveMainAmountChange(MainAmountChangeRequest request) {
+    public MainAmountChangeDto saveMainAmountChange(String changeCaseNo, MainAmountChangeRequest request) {
         MainPolicyMaster master = requirePolicy(request.getPolicyNo(), request.getPolicySeq());
-        requireText(request.getChangeCaseNo(), "changeCaseNo");
+        requireText(changeCaseNo, "changeCaseNo");
         if (request.getMasterInsuredAmount() == null) {
             throw new IllegalArgumentException("masterInsuredAmount 不可空白");
         }
@@ -222,23 +224,23 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
 
         if (fieldChanges.isEmpty()) {
             return MainAmountChangeDto.builder()
-                    .changeCaseNo(request.getChangeCaseNo())
+                    .changeCaseNo(changeCaseNo)
                     .changeItem(MAIN_AMOUNT_CHANGE_ITEM)
                     .changedFieldCount(0)
                     .build();
         }
 
-        ensureChangeCaseSaved(request.getPolicyNo(), request.getPolicySeq(), request.getChangeCaseNo(), MAIN_AMOUNT_CHANGE_ITEM);
+        ensureChangeCaseSaved(request.getPolicyNo(), request.getPolicySeq(), changeCaseNo, MAIN_AMOUNT_CHANGE_ITEM);
         fieldChanges.forEach(fieldChange -> insertFieldChange(
                 request.getPolicyNo(),
                 request.getPolicySeq(),
-                request.getChangeCaseNo(),
+                changeCaseNo,
                 MAIN_AMOUNT_CHANGE_ITEM,
                 fieldChange
         ));
 
         return MainAmountChangeDto.builder()
-                .changeCaseNo(request.getChangeCaseNo())
+                .changeCaseNo(changeCaseNo)
                 .changeItem(MAIN_AMOUNT_CHANGE_ITEM)
                 .changedFieldCount(fieldChanges.size())
                 .build();
@@ -246,58 +248,58 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
 
     @Override
     @Transactional
-    public MainAmountChangeDto saveRiderAmountChange(RiderAmountChangeListRequest request) {
-        requirePolicy(request.getPolicyNo(), request.getPolicySeq());
-        requireText(request.getChangeCaseNo(), "changeCaseNo");
+    public MainAmountChangeDto saveRiderAmountChange(String changeCaseNo, String policyNo, Integer policySeq, RiderAmountChangeListRequest request) {
+        requirePolicy(policyNo, policySeq);
+        requireText(changeCaseNo, "changeCaseNo");
         if (request.getRides() == null || request.getRides().isEmpty()) {
             throw new IllegalArgumentException("rides 不可空白");
         }
 
-        List<MainPolicyRide> rides = policyChangeDao.findRides(request.getPolicyNo(), request.getPolicySeq());
+        List<MainPolicyRide> rides = policyChangeDao.findRides(policyNo, policySeq);
         Map<String, MainPolicyRide> rideMap = new LinkedHashMap<>();
         rides.forEach(ride -> rideMap.put(ride.getRideOrder(), ride));
 
         List<FieldChange> fieldChanges = new ArrayList<>();
-        for (RideAmountChangeRequest rideRequest : request.getRides()) {
-            requireText(rideRequest.getRideOrder(), "rideOrder");
-            if (rideRequest.getInsuredAmount() == null) {
+        for (RideAmountChangeRequest changedRide : request.getRides()) {
+            requireText(changedRide.getRideOrder(), "rideOrder");
+            if (changedRide.getInsuredAmount() == null) {
                 throw new IllegalArgumentException("ride insuredAmount 不可空白");
             }
-            MainPolicyRide beforeRide = rideMap.get(rideRequest.getRideOrder());
+            MainPolicyRide beforeRide = rideMap.get(changedRide.getRideOrder());
             if (beforeRide == null) {
-                throw new NoSuchElementException("找不到附約: " + rideRequest.getRideOrder());
+                throw new NoSuchElementException("找不到附約: " + changedRide.getRideOrder());
             }
             if (MAIN_RIDE_TYPE.equals(beforeRide.getRideType())) {
                 throw new IllegalArgumentException("003 附約保額變更不可修改主約");
             }
             addAmountChangeIfDifferent(
                     fieldChanges,
-                    RIDE_AMOUNT_FIELD_PREFIX + rideRequest.getRideOrder() + RIDE_AMOUNT_FIELD_SUFFIX,
-                    rideRequest.getRideOrder(),
+                    RIDE_AMOUNT_FIELD_PREFIX + changedRide.getRideOrder() + RIDE_AMOUNT_FIELD_SUFFIX,
+                    changedRide.getRideOrder(),
                     beforeRide.getInsuredAmount(),
-                    rideRequest.getInsuredAmount()
+                    changedRide.getInsuredAmount()
             );
         }
 
         if (fieldChanges.isEmpty()) {
             return MainAmountChangeDto.builder()
-                    .changeCaseNo(request.getChangeCaseNo())
+                    .changeCaseNo(changeCaseNo)
                     .changeItem(RIDER_AMOUNT_CHANGE_ITEM)
                     .changedFieldCount(0)
                     .build();
         }
 
-        ensureChangeCaseSaved(request.getPolicyNo(), request.getPolicySeq(), request.getChangeCaseNo(), RIDER_AMOUNT_CHANGE_ITEM);
+        ensureChangeCaseSaved(policyNo, policySeq, changeCaseNo, RIDER_AMOUNT_CHANGE_ITEM);
         fieldChanges.forEach(fieldChange -> insertFieldChange(
-                request.getPolicyNo(),
-                request.getPolicySeq(),
-                request.getChangeCaseNo(),
+                policyNo,
+                policySeq,
+                changeCaseNo,
                 RIDER_AMOUNT_CHANGE_ITEM,
                 fieldChange
         ));
 
         return MainAmountChangeDto.builder()
-                .changeCaseNo(request.getChangeCaseNo())
+                .changeCaseNo(changeCaseNo)
                 .changeItem(RIDER_AMOUNT_CHANGE_ITEM)
                 .changedFieldCount(fieldChanges.size())
                 .build();
@@ -336,7 +338,12 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
             appliedItemCount = applyChangeCase(request.getPolicyNo(), request.getPolicySeq(), changeCaseNo);
         }
 
-        policyChangeDao.updateAcceptanceStatus(request.getPolicyNo(), request.getPolicySeq(), changeCaseNo, acceptanceStatus);
+        policyChangeDao.updateAcceptanceStatus(PolicyChangeAcceptance.builder()
+                .policyNo(request.getPolicyNo())
+                .policySeq(request.getPolicySeq())
+                .changeCaseNo(changeCaseNo)
+                .acceptanceStatus(acceptanceStatus)
+                .build());
         return UpdateChangeCaseStatusDto.builder()
                 .policyNo(request.getPolicyNo())
                 .policySeq(request.getPolicySeq())
@@ -480,8 +487,18 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
         if (policyChangeDao.existsChangeCaseNo(changeCaseNo)) {
             throw new IllegalArgumentException("變更案號已存在: " + changeCaseNo);
         }
-        policyChangeDao.insertAcceptance(policyNo, policySeq, changeCaseNo, ACCEPTANCE_PENDING);
-        policyChangeDao.insertChangeItem(policyNo, policySeq, changeCaseNo, changeItem);
+        policyChangeDao.insertAcceptance(PolicyChangeAcceptance.builder()
+                .policyNo(policyNo)
+                .policySeq(policySeq)
+                .changeCaseNo(changeCaseNo)
+                .acceptanceStatus(ACCEPTANCE_PENDING)
+                .build());
+        policyChangeDao.insertChangeItem(PolicyChangeItem.builder()
+                .policyNo(policyNo)
+                .policySeq(policySeq)
+                .changeCaseNo(changeCaseNo)
+                .changeItem(changeItem)
+                .build());
     }
 
     private MainPolicyMaster requirePolicy(String policyNo, Integer policySeq) {
@@ -564,11 +581,11 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
         }
     }
 
-    private void insertFieldChange(AddressChangeRequest request, FieldChange fieldChange) {
+    private void insertFieldChange(AddressChangeRequest request, String changeCaseNo, FieldChange fieldChange) {
         insertFieldChange(
                 request.getPolicyNo(),
                 request.getPolicySeq(),
-                request.getChangeCaseNo(),
+                changeCaseNo,
                 ADDRESS_CHANGE_ITEM,
                 fieldChange
         );
