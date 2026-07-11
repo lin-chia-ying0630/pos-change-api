@@ -27,10 +27,10 @@ public class MainPolicyAddress {
     // 郵遞區號後 3 碼
     private String zipCode2;
 
-    // 地址全型
+    // 地址
     private String fullWidthAddress;
 
-    // 地址半型
+    // email / 電話 / 手機
     private String halfWidthAddress;
 
     // 建立時間

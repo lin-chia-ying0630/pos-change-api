@@ -34,6 +34,8 @@ Service 必須有介面與實作。
 
 商業規則放在 Service implementation。
 
+欄位正規化、差異比對與格式檢核應放在 `PolicyChangeFieldUtil`，不要散落在 Service implementation。
+
 ### DAO
 
 DAO 是資料存取物件，不是 request 或 response payload。
@@ -53,6 +55,10 @@ Mapper 是 MyBatis mapper 介面與 XML SQL 檔。
 
 - `PolicyChangeMapper`
 - `PolicyChangeMapper.xml`
+
+Entity 或 DTO 查詢優先使用 `resultType="完整類別名稱"`，搭配 `map-underscore-to-camel-case` 自動對應 SQL 欄位與 Java 欄位。
+
+join、別名欄位或聚合資料若 SQL alias 已對應 DTO 欄位，也使用 `resultType`。只有 `resultType` 無法表達特殊巢狀、複合物件或自訂對應時，才新增 `resultMap`。
 
 ### Entity
 
@@ -89,8 +95,11 @@ DTO 原則：
 
 - 除非是 join 其他欄位、畫面聚合資料、計算結果或操作結果，否則不新增 DTO。
 - `@RequestBody` 不直接使用 Entity，需建立 request DTO。
+- `@RequestBody` 參數需加 `@Valid`，Controller 類別需加 `@Validated`。
+- Request DTO 必填欄位需使用 Bean Validation，例如 `@NotBlank`、`@NotNull`、`@NotEmpty`。
 - API 回覆 data 若是一對一對應單一 SQL table row，可以直接使用 Entity，不再包裝 DTO。
 - `ResponseBodyDto<T>` 只負責外層回覆格式，`data` 依上面規則放 Entity 或 DTO。
+- DTO 欄位應補上中文註解，方便對照 request、response 與畫面欄位。
 
 Request body 一律使用 `*Request` DTO：
 
@@ -103,6 +112,15 @@ Request body 一律使用 `*Request` DTO：
 回覆外層：
 
 - `ResponseBodyDto<T>`
+
+## Spring Security 與 CORS
+
+跨域設定統一放在 `SecurityConfig`，不要在 Controller 使用 `@CrossOrigin`。
+
+- `CorsConfigurationSource` 維護允許的前端來源。
+- `SecurityFilterChain` 啟用 CORS。
+- 目前 `/api/**` 不做登入驗證，維持 `permitAll`。
+- 前後端分離 API 關閉 CSRF。
 
 ## 先前重新命名決策
 
@@ -148,11 +166,37 @@ DTO 與 Entity 應使用 Lombok 讓程式碼簡潔：
 
 新增 DTO 與 Entity 時維持此標準，除非有框架需求或刻意設計成不可變模型。
 
+## CodeDescription 與 Enum 命名
+
+`code_description` 已管理的業務代碼不再另外建立 enum，避免資料庫與 Java 重複維護。
+
+例如以下代碼應由 `CodeDescription` 取得 `code_before`：
+
+- 地址型態，例如通訊地址。
+- 保全變更項目，例如地址變更、主約保額變更、附約保額變更。
+- 受理狀態，例如受理中、完成、取消。
+- 附約型態，例如主約。
+
+目前 enum 與 properties 分工：
+
+- `CodeTable`：共用代碼檔查詢用的 `code_group` 與 `code_field`，不存放實際代碼值。
+- `CodeDescriptionMeaning`：定義系統要查找的穩定代碼 key，例如 `CHANGE_ITEM/001`，不依賴中文 `code_description`。
+- `PolicyChangeFieldName`：保全異動欄位名稱與主檔可回寫欄位白名單。
+- `RideChangeField`：主附約保額、保費異動欄位的組合與解析規則。
+- `PolicyRideKey`：主約列判斷用的附約序號。
+- `PosChangeProperties`：只讀取環境相關設定，目前為案號日期時區。
+- `PostalCodeRule`：郵遞區號檢核規則。
+
+新增固定業務代碼時優先補 `code_description`；程式判斷使用穩定代碼 key，不使用中文描述當查詢條件。只有欄位白名單、regex、欄位組合規則這類非 code table 資料才放 enum。
+
 ## 商業 Key 命名
 
 `policy_change_field.change_key` 用來記錄目標資料列 key。當同一張保單有多筆相關資料時，靠它定位要回寫哪一筆：
 
 - 地址變更 `001`：`change_key = address_type`。
+- 地址型態 `01/02`：郵遞區號與地址必填；`email / 電話 / 手機` 欄位鎖住且不列入異動。
+- 地址型態 `11/12/31`：`email / 電話 / 手機` 必填；郵遞區號與地址可空白且不列入異動。
+- 聯絡資料若歷史資料同時存在 `full_width_address` 與 `half_width_address`，後端以畫面顯示的有效聯絡值判斷是否異動；畫面未修改時不可建立異動欄位。
 - 主約保額變更 `002`：主檔用 `change_key = MASTER`，主約附約列用 `change_key = 000`。
 - 附約保額變更 `003`：`change_key = ride_order`。
 
@@ -171,8 +215,8 @@ Controller 的每一支 API 方法上方都應保留簡短註解，標示該 API
 
 ## 地址與總保費命名
 
-- `PostalCodeAreaDto.addressPrefix`：中文全型地址前綴。
-- `PostalCodeAreaDto.halfWidthAddressPrefix`：英文半形地址前綴，來源為 `code_description.code_description`。
+- `PostalCodeAreaDto.addressPrefix`：中文地址前綴。
+- `PostalCodeAreaDto.halfWidthAddressPrefix`：保留相容舊欄位，地址變更畫面不再寫入 `email / 電話 / 手機`。
 - `main_policy_master.premium`：總保費，不是可直接手動修改的主檔保費。
 - `main_policy_ride.premium`：主附約各列保費，總保費由這些資料列加總回寫。
 
@@ -197,3 +241,19 @@ Controller 的每一支 API 方法上方都應保留簡短註解，標示該 API
 新增流程只產生 `P`。
 
 覆核流程負責將 `P` 改為 `S` 或 `C`。
+
+## 環境設定
+
+案號日期時區由 `application.properties` 的 `pos.change-case.zone-id` 控制，預設讀取環境變數：
+
+```properties
+pos.change-case.zone-id=${CHANGE_CASE_ZONE_ID:Asia/Taipei}
+```
+
+未設定 `CHANGE_CASE_ZONE_ID` 時使用 `Asia/Taipei`。
+
+業務代碼與欄位規則不要放在 `application.properties`：
+
+- 代碼值與顯示文字放 `code_description`。
+- 查詢哪一組代碼由 `CodeTable` 定義。
+- 欄位名稱、欄位白名單、主附約欄位組合由 enum 定義。

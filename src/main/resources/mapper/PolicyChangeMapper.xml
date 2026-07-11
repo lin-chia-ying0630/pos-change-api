@@ -3,66 +3,6 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.alin.lin.mapper.PolicyChangeMapper">
-    <resultMap id="CodeDescriptionResultMap" type="com.alin.lin.entity.CodeDescription">
-        <id property="codeGroup" column="code_group"/>
-        <id property="codeField" column="code_field"/>
-        <id property="codeBefore" column="code_before"/>
-        <result property="codeAfter" column="code_after"/>
-        <result property="codeDescription" column="code_description"/>
-    </resultMap>
-
-    <resultMap id="PolicyChangeCaseResultMap" type="com.alin.lin.dto.PolicyChangeCaseDto">
-        <id property="policyNo" column="policy_no"/>
-        <id property="policySeq" column="policy_seq"/>
-        <id property="changeCaseNo" column="change_case_no"/>
-        <result property="acceptanceStatus" column="acceptance_status"/>
-        <result property="acceptanceStatusDescription" column="acceptance_status_description"/>
-        <result property="changeItems" column="change_items"/>
-        <result property="changeItemDescriptions" column="change_item_descriptions"/>
-    </resultMap>
-
-    <resultMap id="PolicyChangeAcceptanceResultMap" type="com.alin.lin.entity.PolicyChangeAcceptance">
-        <id property="policyNo" column="policy_no"/>
-        <id property="policySeq" column="policy_seq"/>
-        <id property="changeCaseNo" column="change_case_no"/>
-        <result property="acceptanceStatus" column="acceptance_status"/>
-        <result property="createdAt" column="created_at"/>
-        <result property="updatedAt" column="updated_at"/>
-    </resultMap>
-
-    <resultMap id="PolicyChangeItemResultMap" type="com.alin.lin.entity.PolicyChangeItem">
-        <id property="policyNo" column="policy_no"/>
-        <id property="policySeq" column="policy_seq"/>
-        <id property="changeCaseNo" column="change_case_no"/>
-        <id property="changeItem" column="change_item"/>
-        <result property="createdAt" column="created_at"/>
-    </resultMap>
-
-    <resultMap id="PolicyChangeFieldResultMap" type="com.alin.lin.entity.PolicyChangeField">
-        <id property="id" column="id"/>
-        <result property="policyNo" column="policy_no"/>
-        <result property="policySeq" column="policy_seq"/>
-        <result property="changeCaseNo" column="change_case_no"/>
-        <result property="changeItem" column="change_item"/>
-        <result property="changeField" column="change_field"/>
-        <result property="changeKey" column="change_key"/>
-        <result property="contentBefore" column="content_before"/>
-        <result property="contentAfter" column="content_after"/>
-        <result property="createdAt" column="created_at"/>
-    </resultMap>
-
-    <resultMap id="PolicyChangeFileResultMap" type="com.alin.lin.entity.PolicyChangeFile">
-        <id property="id" column="id"/>
-        <result property="policyNo" column="policy_no"/>
-        <result property="policySeq" column="policy_seq"/>
-        <result property="changeCaseNo" column="change_case_no"/>
-        <result property="changeItem" column="change_item"/>
-        <result property="changeFile" column="change_file"/>
-        <result property="contentBefore" column="content_before"/>
-        <result property="contentAfter" column="content_after"/>
-        <result property="createdAt" column="created_at"/>
-    </resultMap>
-
     <select id="findMaster" resultType="com.alin.lin.entity.MainPolicyMaster">
         SELECT *
         FROM main_policy_master
@@ -94,7 +34,7 @@
         ORDER BY ride_order
     </select>
 
-    <select id="findCodes" resultMap="CodeDescriptionResultMap">
+    <select id="findCodes" resultType="com.alin.lin.entity.CodeDescription">
         SELECT code_group,
                code_field,
                code_before,
@@ -106,7 +46,7 @@
         ORDER BY code_before
     </select>
 
-    <select id="findCode" resultMap="CodeDescriptionResultMap">
+    <select id="findCode" resultType="com.alin.lin.entity.CodeDescription">
         SELECT code_group,
                code_field,
                code_before,
@@ -130,7 +70,7 @@
         WHERE change_case_no LIKE CONCAT(#{changeCaseNoPrefix}, '%')
     </select>
 
-    <select id="findChangeCases" resultMap="PolicyChangeCaseResultMap">
+    <select id="findChangeCases" resultType="com.alin.lin.dto.PolicyChangeCaseDto">
         SELECT a.policy_no,
                a.policy_seq,
                a.change_case_no,
@@ -156,7 +96,7 @@
         ORDER BY a.created_at DESC
     </select>
 
-    <select id="findChangeCase" resultMap="PolicyChangeCaseResultMap">
+    <select id="findChangeCase" resultType="com.alin.lin.dto.PolicyChangeCaseDto">
         SELECT a.policy_no,
                a.policy_seq,
                a.change_case_no,
@@ -192,7 +132,7 @@
         ORDER BY change_item
     </select>
 
-    <select id="findChangeFilesByItem" resultMap="PolicyChangeFileResultMap">
+    <select id="findChangeFilesByItem" resultType="com.alin.lin.entity.PolicyChangeFile">
         SELECT id,
                policy_no,
                policy_seq,
@@ -209,7 +149,7 @@
         ORDER BY id
     </select>
 
-    <select id="findChangeFieldsByItem" resultMap="PolicyChangeFieldResultMap">
+    <select id="findChangeFieldsByItem" resultType="com.alin.lin.entity.PolicyChangeField">
         SELECT id,
                policy_no,
                policy_seq,

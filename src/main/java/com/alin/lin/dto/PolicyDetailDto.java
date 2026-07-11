@@ -16,11 +16,24 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PolicyDetailDto {
+    // 保單主檔
     private MainPolicyMaster master;
+
+    // 通訊地址
     private MainPolicyAddress communicationAddress;
+
+    // 保單地址清單
     private List<MainPolicyAddress> addressList;
+
+    // 保單主附約清單
     private List<MainPolicyRide> rideList;
+
+    // 地址型態代碼清單
     private List<CodeDescription> addressTypes;
+
+    // 受理狀態代碼清單
     private List<CodeDescription> acceptanceStatuses;
+
+    // 保全變更項目代碼清單
     private List<CodeDescription> changeItems;
 }

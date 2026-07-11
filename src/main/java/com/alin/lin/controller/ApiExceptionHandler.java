@@ -2,6 +2,7 @@ package com.alin.lin.controller;
 
 import com.alin.lin.dto.ResponseBodyDto;
 import com.alin.lin.util.ResponseUtil;
+import jakarta.validation.ConstraintViolationException;
 import org.mybatis.spring.MyBatisSystemException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,11 +10,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -22,6 +26,31 @@ public class ApiExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ResponseBodyDto<Void>> handleBadRequest(IllegalArgumentException exception) {
         return ResponseUtil.badRequest(exception.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ResponseBodyDto<Void>> handleRequestValidation(MethodArgumentNotValidException exception) {
+        String message = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getDefaultMessage())
+                .collect(Collectors.joining("、"));
+        return ResponseUtil.badRequest(message);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ResponseBodyDto<Void>> handleConstraintViolation(ConstraintViolationException exception) {
+        String message = exception.getConstraintViolations().stream()
+                .map(violation -> violation.getMessage())
+                .collect(Collectors.joining("、"));
+        return ResponseUtil.badRequest(message);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ResponseBodyDto<Void>> handleMethodValidation(HandlerMethodValidationException exception) {
+        String message = exception.getParameterValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream())
+                .map(error -> error.getDefaultMessage())
+                .collect(Collectors.joining("、"));
+        return ResponseUtil.badRequest(message);
     }
 
     @ExceptionHandler(NoSuchElementException.class)
