@@ -113,7 +113,7 @@
 ## Security 與設定
 
 - CORS origin 從 `pos.cors.allowed-origins`／`CORS_ALLOWED_ORIGINS` 取得，不可硬寫在 Controller。
-- `local` 可關閉驗證；`prod` 必須開啟 `pos.security.enabled=true`。
+- `local` 由 `POS_SECURITY_ENABLED` 決定且預設關閉；`prod` 必須開啟 `pos.security.enabled=true`。
 - MAKER 可新增與儲存；REVIEWER 才能覆核。
 - DB 與帳號密碼只能由環境變數、Docker secret 或 K8s Secret 提供，程式不得有正式預設密碼。
 - K8s 使用 Actuator liveness/readiness endpoint。

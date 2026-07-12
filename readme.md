@@ -128,7 +128,7 @@ flowchart TD
 
 ## Security 與 CORS
 
-本機預設可設定 `POS_SECURITY_ENABLED=false`。正式環境使用 `prod` profile，必須設定：
+本機與 Compose 預設 `POS_SECURITY_ENABLED=false`；需要驗證登入流程時可改為 `true`。`local` profile 也會讀取此環境變數，不會固定關閉 Security。正式環境使用 `prod` profile，必須設定：
 
 ```text
 POS_SECURITY_ENABLED=true
