@@ -231,6 +231,40 @@ docker build -t pos-change-api:latest .
 - 金額比對忽略小數位 scale，例如 `1000000.00` 與 `1000000`。
 - 郵遞區號前三碼必填，後三碼可空白；若填寫需為 3 碼。
 
+`MaskedSqlLogInterceptorTest` 應覆蓋 SQL 參數遮罩：
+
+- email 只保留第一碼與 domain。
+- `tel` / `phone` / `mobile` / `cell` 電話與手機保留前三碼與後三碼。
+- `policyNo` / `policy_no` 保單號碼保留前三碼與後三碼。
+- `fullWidthAddress` / `halfWidthAddress` / `address` / `add` 地址保留前六個字。
+- 一般文字需遮中段。
+- 數字型欄位可原樣顯示。
+
+## SQL Log 與個資遮罩
+
+不要開啟 MyBatis `StdOutImpl`，因為它會原樣印出 `Parameters`：
+
+```properties
+mybatis.configuration.log-impl=org.apache.ibatis.logging.nologging.NoLoggingImpl
+# mybatis.configuration.log-impl=org.apache.ibatis.logging.stdout.StdOutImpl
+logging.level.com.alin.lin.mapper=info
+```
+
+Debug console 需要 SQL 時，統一使用專案的 MyBatis interceptor：
+
+```properties
+logging.level.com.alin.lin.interceptor.MaskedSqlLogInterceptor=debug
+```
+
+`MaskedSqlLogInterceptor` 只在 debug level 開啟時輸出，內容包含 SQL id、SQL 與遮罩後參數。新增敏感資料型態時，先補遮罩規則與測試。
+
+`logback-spring.xml` 需保留 console 與 rolling file appender：
+
+- 目前 log：`logs/pos-change-api.log`。
+- 歷史 log：`logs/pos-change-api.yyyy-MM-dd.i.log.gz`。
+- 每天切檔，單檔 100MB，保留 30 天，總容量 3GB。
+- 可用 `LOG_PATH` 環境變數改存放位置。
+
 ## Docker
 
 Docker image 使用多階段建置：第一階段用 Maven 建 jar，第二階段用 Java 17 JRE 執行。

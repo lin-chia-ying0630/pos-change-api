@@ -257,3 +257,68 @@ pos.change-case.zone-id=${CHANGE_CASE_ZONE_ID:Asia/Taipei}
 - 代碼值與顯示文字放 `code_description`。
 - 查詢哪一組代碼由 `CodeTable` 定義。
 - 欄位名稱、欄位白名單、主附約欄位組合由 enum 定義。
+
+## SQL Log 與個資遮罩
+
+不要開啟 MyBatis `StdOutImpl`，因為它會原樣印出 `Parameters`，可能包含保單號碼、email、電話、手機或地址：
+
+```properties
+mybatis.configuration.log-impl=org.apache.ibatis.logging.nologging.NoLoggingImpl
+# mybatis.configuration.log-impl=org.apache.ibatis.logging.stdout.StdOutImpl
+logging.level.com.alin.lin.mapper=info
+```
+
+Debug console 看 SQL 時，統一使用 `MaskedSqlLogInterceptor`：
+
+```properties
+logging.level.com.alin.lin.interceptor.MaskedSqlLogInterceptor=debug
+```
+
+`logback-spring.xml` 會同時輸出到 console 與檔案：
+
+```text
+logs/pos-change-api.log
+logs/pos-change-api.2026-07-12.0.log.gz
+```
+
+查目前 log：
+
+```bash
+tail -f logs/pos-change-api.log
+```
+
+查歷史遮罩 SQL log：
+
+```bash
+zgrep "Masked parameters" logs/pos-change-api.*.log.gz
+```
+
+檔案保留規則：
+
+- 每天切檔。
+- 單檔超過 100MB 會再切序號。
+- 保留 30 天。
+- 總容量上限 3GB。
+
+若要調整 log 存放路徑，可設定環境變數：
+
+```bash
+LOG_PATH=/var/log/pos-change-api
+```
+
+輸出會包含 SQL id、SQL 與遮罩後參數，例如：
+
+```text
+SQL id: com.alin.lin.mapper.PolicyChangeMapper.findMaster
+SQL: SELECT ... WHERE policy_no = ? AND policy_seq = ?
+Masked parameters: [policyNo=P00***001, policySeq=1]
+```
+
+遮罩規則集中在 `MaskedSqlLogInterceptor.maskValue`，並優先依壽險常見欄位名稱判斷：
+
+- `policyNo` / `policy_no`：保單號碼保留前 3 碼與後 3 碼。
+- `fullWidthAddress` / `halfWidthAddress` / `address` / `add`：地址保留前 6 個字，其餘遮蔽。
+- `tel` / `phone` / `mobile` / `cell`：電話、手機保留前 3 碼與後 3 碼。
+- `email`：保留第一碼與 domain。
+
+新增敏感欄位時應優先補測試。
