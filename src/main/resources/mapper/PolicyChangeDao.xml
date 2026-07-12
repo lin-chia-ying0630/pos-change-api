@@ -2,12 +2,20 @@
 <!DOCTYPE mapper
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.alin.lin.mapper.PolicyChangeMapper">
+<mapper namespace="com.alin.lin.dao.PolicyChangeDao">
     <select id="findMaster" resultType="com.alin.lin.entity.MainPolicyMaster">
         SELECT *
         FROM main_policy_master
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
+    </select>
+
+    <select id="findMasterForUpdate" resultType="com.alin.lin.entity.MainPolicyMaster">
+        SELECT *
+        FROM main_policy_master
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+        FOR UPDATE
     </select>
 
     <select id="findAddress" resultType="com.alin.lin.entity.MainPolicyAddress">
@@ -16,6 +24,15 @@
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
           AND address_type = #{addressType}
+    </select>
+
+    <select id="findAddressForUpdate" resultType="com.alin.lin.entity.MainPolicyAddress">
+        SELECT *
+        FROM main_policy_address
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND address_type = #{addressType}
+        FOR UPDATE
     </select>
 
     <select id="findAddresses" resultType="com.alin.lin.entity.MainPolicyAddress">
@@ -32,6 +49,15 @@
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
         ORDER BY ride_order
+    </select>
+
+    <select id="findRidesForUpdate" resultType="com.alin.lin.entity.MainPolicyRide">
+        SELECT *
+        FROM main_policy_ride
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+        ORDER BY ride_order
+        FOR UPDATE
     </select>
 
     <select id="findCodes" resultType="com.alin.lin.entity.CodeDescription">
@@ -58,16 +84,21 @@
           AND code_before = #{codeBefore}
     </select>
 
+    <insert id="incrementCaseSequence">
+        INSERT INTO policy_change_case_sequence (sequence_date, current_serial)
+        VALUES (#{sequenceDate}, LAST_INSERT_ID(1))
+        ON DUPLICATE KEY UPDATE
+            current_serial = LAST_INSERT_ID(current_serial + 1)
+    </insert>
+
+    <select id="findLastInsertedSequence" resultType="long">
+        SELECT LAST_INSERT_ID()
+    </select>
+
     <select id="existsChangeCaseNo" resultType="int">
         SELECT COUNT(*)
         FROM policy_change_acceptance
         WHERE change_case_no = #{changeCaseNo}
-    </select>
-
-    <select id="findMaxChangeCaseNoByPrefix" resultType="string">
-        SELECT MAX(change_case_no)
-        FROM policy_change_acceptance
-        WHERE change_case_no LIKE CONCAT(#{changeCaseNoPrefix}, '%')
     </select>
 
     <select id="findChangeCases" resultType="com.alin.lin.dto.PolicyChangeCaseDto">
@@ -139,14 +170,17 @@
                change_case_no,
                change_item,
                change_file,
+               change_key,
                content_before,
-               content_after
+               content_after,
+               created_at,
+               updated_at
         FROM policy_change_file
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
           AND change_case_no = #{changeCaseNo}
           AND change_item = #{changeItem}
-        ORDER BY id
+        ORDER BY change_key, id
     </select>
 
     <select id="findChangeFieldsByItem" resultType="com.alin.lin.entity.PolicyChangeField">
@@ -158,13 +192,53 @@
                change_field,
                change_key,
                content_before,
-               content_after
+               content_after,
+               created_at,
+               updated_at
         FROM policy_change_field
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
           AND change_case_no = #{changeCaseNo}
           AND change_item = #{changeItem}
         ORDER BY id
+    </select>
+
+    <select id="findChangeFilesByCaseNo" resultType="com.alin.lin.entity.PolicyChangeFile">
+        SELECT id,
+               policy_no,
+               policy_seq,
+               change_case_no,
+               change_item,
+               change_file,
+               change_key,
+               content_before,
+               content_after,
+               created_at,
+               updated_at
+        FROM policy_change_file
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+        ORDER BY change_item, change_file, change_key, id
+    </select>
+
+    <select id="findChangeFieldsByCaseNo" resultType="com.alin.lin.entity.PolicyChangeField">
+        SELECT id,
+               policy_no,
+               policy_seq,
+               change_case_no,
+               change_item,
+               change_field,
+               change_key,
+               content_before,
+               content_after,
+               created_at,
+               updated_at
+        FROM policy_change_field
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+        ORDER BY change_item, change_key, change_field, id
     </select>
 
     <insert id="insertAcceptance">
@@ -186,7 +260,7 @@
           AND change_item = #{changeItem}
     </select>
 
-    <insert id="insertChangeField">
+    <insert id="upsertChangeField">
         INSERT INTO policy_change_field (
             policy_no,
             policy_seq,
@@ -207,15 +281,20 @@
             #{contentBefore},
             #{contentAfter}
         )
+        ON DUPLICATE KEY UPDATE
+            content_before = VALUES(content_before),
+            content_after = VALUES(content_after),
+            updated_at = CURRENT_TIMESTAMP
     </insert>
 
-    <insert id="insertChangeFile">
+    <insert id="upsertChangeFile">
         INSERT INTO policy_change_file (
             policy_no,
             policy_seq,
             change_case_no,
             change_item,
             change_file,
+            change_key,
             content_before,
             content_after
         )
@@ -225,17 +304,92 @@
             #{changeCaseNo},
             #{changeItem},
             #{changeFile},
+            #{changeKey},
             #{contentBefore},
             #{contentAfter}
         )
+        ON DUPLICATE KEY UPDATE
+            content_before = VALUES(content_before),
+            content_after = VALUES(content_after),
+            updated_at = CURRENT_TIMESTAMP
     </insert>
 
-    <update id="updateAcceptanceStatus">
-        UPDATE policy_change_acceptance
-        SET acceptance_status = #{acceptanceStatus}
+    <delete id="deleteChangeFieldsByItem">
+        DELETE FROM policy_change_field
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
           AND change_case_no = #{changeCaseNo}
+          AND change_item = #{changeItem}
+    </delete>
+
+    <delete id="deleteChangeFieldsByItemAndKey">
+        DELETE FROM policy_change_field
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+          AND change_item = #{changeItem}
+          AND change_key = #{changeKey}
+    </delete>
+
+    <delete id="deleteChangeFileByItemAndKey">
+        DELETE FROM policy_change_file
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+          AND change_item = #{changeItem}
+          AND change_file = #{changeFile}
+          AND change_key = #{changeKey}
+    </delete>
+
+    <select id="countChangeFieldsByItem" resultType="int">
+        SELECT COUNT(*)
+        FROM policy_change_field
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+          AND change_item = #{changeItem}
+    </select>
+
+    <select id="countChangeFilesByItem" resultType="int">
+        SELECT COUNT(*)
+        FROM policy_change_file
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+          AND change_item = #{changeItem}
+    </select>
+
+    <delete id="deleteChangeItem">
+        DELETE FROM policy_change_item
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+          AND change_item = #{changeItem}
+    </delete>
+
+    <select id="countChangeItemsByCaseNo" resultType="int">
+        SELECT COUNT(*)
+        FROM policy_change_item
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+    </select>
+
+    <delete id="deleteAcceptance">
+        DELETE FROM policy_change_acceptance
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+          AND acceptance_status = #{expectedStatus}
+    </delete>
+
+    <update id="updateAcceptanceStatusIfCurrent">
+        UPDATE policy_change_acceptance
+        SET acceptance_status = #{acceptance.acceptanceStatus}
+        WHERE policy_no = #{acceptance.policyNo}
+          AND policy_seq = #{acceptance.policySeq}
+          AND change_case_no = #{acceptance.changeCaseNo}
+          AND acceptance_status = #{expectedStatus}
     </update>
 
     <update id="updateAddress">

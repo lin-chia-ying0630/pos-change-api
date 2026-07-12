@@ -7,6 +7,7 @@ import com.alin.lin.dto.CreateChangeCaseRequest;
 import com.alin.lin.dto.MainAmountChangeDto;
 import com.alin.lin.dto.MainAmountChangeRequest;
 import com.alin.lin.dto.PolicyChangeCaseDto;
+import com.alin.lin.dto.PolicyChangeCaseDetailDto;
 import com.alin.lin.dto.PolicyDetailDto;
 import com.alin.lin.dto.PostalCodeAreaDto;
 import com.alin.lin.dto.RiderAmountChangeListRequest;
@@ -29,6 +30,8 @@ public interface PolicyChangeService {
     MainAmountChangeDto saveRiderAmountChange(String changeCaseNo, String policyNo, Integer policySeq, RiderAmountChangeListRequest request);
 
     List<PolicyChangeCaseDto> findChangeCases(String policyNo);
+
+    PolicyChangeCaseDetailDto findChangeCaseDetail(String policyNo, Integer policySeq, String changeCaseNo);
 
     UpdateChangeCaseStatusDto updateChangeCaseStatus(String changeCaseNo, UpdateChangeCaseStatusRequest request);
 }

@@ -58,6 +58,10 @@ public class ResponseUtil {
         return builder(HttpStatus.NOT_FOUND, false, null, "", "", errorMessage);
     }
 
+    public static <T> ResponseEntity<ResponseBodyDto<T>> conflict(String errorMessage) {
+        return builder(HttpStatus.CONFLICT, false, null, "", "", errorMessage);
+    }
+
     public static <T> ResponseEntity<ResponseBodyDto<T>> serverError(String errorMessage) {
         return builder(HttpStatus.INTERNAL_SERVER_ERROR, false, null, "", "", errorMessage);
     }

@@ -25,6 +25,8 @@ import static com.alin.lin.util.PolicyChangeFieldUtil.validateAddressPostalCodeF
 
 @Service
 public class AddressChangeSaveServiceImpl implements AddressChangeSaveService {
+    private static final String ADDRESS_CHANGE_FILE = "main_policy_address";
+
     private final PolicyChangeDao policyChangeDao;
     private final PolicyChangeSupportService policyChangeSupportService;
     private final CodeDescriptionService codeDescriptionService;
@@ -75,7 +77,28 @@ public class AddressChangeSaveServiceImpl implements AddressChangeSaveService {
 
         String addressChangeItem = codeDescriptionService.addressChangeItemCode();
         List<FieldChange> fieldChanges = collectAddressFieldChanges(beforeAddress, afterAddress);
+        policyChangeDao.deleteChangeFieldsByItemAndKey(
+                request.getPolicyNo(),
+                request.getPolicySeq(),
+                changeCaseNo,
+                addressChangeItem,
+                addressType
+        );
+        policyChangeDao.deleteChangeFileByItemAndKey(
+                request.getPolicyNo(),
+                request.getPolicySeq(),
+                changeCaseNo,
+                addressChangeItem,
+                ADDRESS_CHANGE_FILE,
+                addressType
+        );
         if (fieldChanges.isEmpty()) {
+            policyChangeSupportService.removeEmptyChangeItemAndAcceptance(
+                    request.getPolicyNo(),
+                    request.getPolicySeq(),
+                    changeCaseNo,
+                    addressChangeItem
+            );
             return AddressChangeDto.builder()
                     .changeCaseNo(changeCaseNo)
                     .changeItem(addressChangeItem)
@@ -84,7 +107,7 @@ public class AddressChangeSaveServiceImpl implements AddressChangeSaveService {
         }
 
         policyChangeSupportService.ensureChangeCaseSaved(request.getPolicyNo(), request.getPolicySeq(), changeCaseNo, addressChangeItem);
-        fieldChanges.forEach(fieldChange -> policyChangeSupportService.insertFieldChange(
+        fieldChanges.forEach(fieldChange -> policyChangeSupportService.upsertFieldChange(
                 request.getPolicyNo(),
                 request.getPolicySeq(),
                 changeCaseNo,
@@ -92,12 +115,13 @@ public class AddressChangeSaveServiceImpl implements AddressChangeSaveService {
                 fieldChange
         ));
 
-        policyChangeDao.insertChangeFile(
+        policyChangeDao.upsertChangeFile(
                 request.getPolicyNo(),
                 request.getPolicySeq(),
                 changeCaseNo,
                 addressChangeItem,
-                "main_policy_address",
+                ADDRESS_CHANGE_FILE,
+                addressType,
                 toJson(addressSnapshot(beforeAddress)),
                 toJson(addressSnapshot(afterAddress))
         );

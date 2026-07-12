@@ -7,6 +7,7 @@ import com.alin.lin.dto.CreateChangeCaseRequest;
 import com.alin.lin.dto.MainAmountChangeDto;
 import com.alin.lin.dto.MainAmountChangeRequest;
 import com.alin.lin.dto.PolicyChangeCaseDto;
+import com.alin.lin.dto.PolicyChangeCaseDetailDto;
 import com.alin.lin.dto.PolicyDetailDto;
 import com.alin.lin.dto.PostalCodeAreaDto;
 import com.alin.lin.dto.ResponseBodyDto;
@@ -94,6 +95,16 @@ public class PolicyChangeController {
     @GetMapping("/policies/{policyNo}/change-cases")
     public ResponseEntity<ResponseBodyDto<List<PolicyChangeCaseDto>>> findChangeCases(@PathVariable @NotBlank(message = "policyNo 不可空白") String policyNo) {
         return ResponseUtil.ok(policyChangeService.findChangeCases(policyNo));
+    }
+
+    // 畫面對應：查詢保全變更頁與覆核頁展開案件，顯示每個欄位及檔案快照的異動前後值。
+    @GetMapping("/policies/{policyNo}/{policySeq}/change-cases/{changeCaseNo}")
+    public ResponseEntity<ResponseBodyDto<PolicyChangeCaseDetailDto>> findChangeCaseDetail(
+            @PathVariable @NotBlank(message = "policyNo 不可空白") String policyNo,
+            @PathVariable @NotNull(message = "policySeq 不可空白") Integer policySeq,
+            @PathVariable @NotBlank(message = "changeCaseNo 不可空白") String changeCaseNo
+    ) {
+        return ResponseUtil.ok(policyChangeService.findChangeCaseDetail(policyNo, policySeq, changeCaseNo));
     }
 
     // 畫面對應：覆核頁將 P-受理中案件改為 S-完成或 C-取消，完成時才回寫主檔、地址或主附約。

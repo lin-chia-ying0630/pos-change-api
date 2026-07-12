@@ -5,7 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-@MapperScan("com.alin.lin.mapper")
+@MapperScan("com.alin.lin.dao")
 public class App {
     public static void main(String[] args) {
         SpringApplication.run(App.class, args);

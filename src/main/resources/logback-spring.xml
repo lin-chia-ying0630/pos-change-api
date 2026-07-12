@@ -27,7 +27,7 @@
     </appender>
 
     <logger name="org.mybatis" level="INFO"/>
-    <logger name="com.alin.lin.mapper" level="INFO"/>
+    <logger name="com.alin.lin.dao" level="INFO"/>
     <logger name="java.sql" level="INFO"/>
     <logger name="java.sql.Connection" level="INFO"/>
     <logger name="java.sql.Statement" level="INFO"/>

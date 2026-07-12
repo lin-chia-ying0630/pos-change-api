@@ -25,6 +25,9 @@ public enum CodeDescriptionMeaning {
     // 受理中
     PENDING_STATUS(CodeTable.ACCEPTANCE_STATUS, "P"),
 
+    // 覆核套用中
+    PROCESSING_STATUS(CodeTable.ACCEPTANCE_STATUS, "A"),
+
     // 完成
     COMPLETE_STATUS(CodeTable.ACCEPTANCE_STATUS, "S"),
 

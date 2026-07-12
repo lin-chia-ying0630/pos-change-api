@@ -2,11 +2,14 @@ package com.alin.lin.service.impl;
 
 import com.alin.lin.dao.PolicyChangeDao;
 import com.alin.lin.entity.MainPolicyAddress;
+import com.alin.lin.entity.MainPolicyMaster;
+import com.alin.lin.entity.MainPolicyRide;
 import com.alin.lin.entity.PolicyChangeField;
 import com.alin.lin.entity.PolicyChangeFile;
 import com.alin.lin.enums.PolicyChangeFieldName;
 import com.alin.lin.enums.PolicyRideKey;
 import com.alin.lin.enums.RideChangeField;
+import com.alin.lin.exception.ChangeCaseConflictException;
 import com.alin.lin.service.ChangeCaseApplyService;
 import com.alin.lin.service.CodeDescriptionService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -14,7 +17,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import static com.alin.lin.util.PolicyChangeFieldUtil.amountEquals;
+import static com.alin.lin.util.PolicyChangeFieldUtil.collectAddressFieldChanges;
 import static com.alin.lin.util.PolicyChangeFieldUtil.normalizeBlank;
 
 @Service
@@ -51,7 +59,7 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
                 premiumTotalShouldRefresh = applyMainAmountChanges(policyNo, policySeq, changeCaseNo, changeItem);
                 appliedItemCount++;
                 if (premiumTotalShouldRefresh) {
-                    policyChangeDao.updateMasterTotalPremiumFromRides(policyNo, policySeq);
+                    refreshMasterTotalPremium(policyNo, policySeq);
                 }
                 continue;
             }
@@ -59,7 +67,7 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
                 premiumTotalShouldRefresh = applyRiderAmountChanges(policyNo, policySeq, changeCaseNo, changeItem);
                 appliedItemCount++;
                 if (premiumTotalShouldRefresh) {
-                    policyChangeDao.updateMasterTotalPremiumFromRides(policyNo, policySeq);
+                    refreshMasterTotalPremium(policyNo, policySeq);
                 }
                 continue;
             }
@@ -75,8 +83,15 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
             throw new IllegalStateException("找不到地址變更檔案: " + changeCaseNo);
         }
         for (PolicyChangeFile changeFile : changeFiles) {
+            MainPolicyAddress beforeAddress = readAddress(changeFile.getContentBefore());
             MainPolicyAddress address = readAddress(changeFile.getContentAfter());
-            policyChangeDao.updateAddress(address);
+            MainPolicyAddress currentAddress = policyChangeDao.findAddressForUpdate(
+                    policyNo, policySeq, address.getAddressType()
+            );
+            if (currentAddress == null || !collectAddressFieldChanges(currentAddress, beforeAddress).isEmpty()) {
+                throw new ChangeCaseConflictException("地址資料已被其他案件修改，請重新建立變更: " + address.getAddressType());
+            }
+            requireSingleRowUpdate(policyChangeDao.updateAddress(address), "地址回寫失敗: " + address.getAddressType());
         }
     }
 
@@ -85,11 +100,20 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
         if (changeFields.isEmpty()) {
             throw new IllegalStateException("找不到主檔變更欄位: " + changeCaseNo);
         }
+        MainPolicyMaster master = lockMaster(policyNo, policySeq);
+        for (PolicyChangeField changeField : changeFields) {
+            assertMasterBeforeValue(master, changeField);
+        }
         for (PolicyChangeField changeField : changeFields) {
             if (!PolicyChangeFieldName.masterChangeFieldNames().contains(changeField.getChangeField())) {
                 throw new IllegalArgumentException("不支援回寫主檔欄位: " + changeField.getChangeField());
             }
-            policyChangeDao.updateMasterField(policyNo, policySeq, changeField.getChangeField(), changeField.getContentAfter());
+            requireSingleRowUpdate(
+                    policyChangeDao.updateMasterField(
+                            policyNo, policySeq, changeField.getChangeField(), changeField.getContentAfter()
+                    ),
+                    "主檔欄位回寫失敗: " + changeField.getChangeField()
+            );
         }
     }
 
@@ -98,10 +122,23 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
         if (changeFields.isEmpty()) {
             throw new IllegalStateException("找不到主保額變更欄位: " + changeCaseNo);
         }
+        MainPolicyMaster master = lockMaster(policyNo, policySeq);
+        Map<String, MainPolicyRide> rides = lockedRideMap(policyNo, policySeq);
+        for (PolicyChangeField changeField : changeFields) {
+            assertAmountBeforeValue(master, rides, changeField);
+        }
         boolean premiumChanged = false;
         for (PolicyChangeField changeField : changeFields) {
             if (PolicyChangeFieldName.MASTER_INSURED_AMOUNT.getFieldName().equals(changeField.getChangeField())) {
-                policyChangeDao.updateMasterField(policyNo, policySeq, PolicyChangeFieldName.INSURED_AMOUNT.getFieldName(), changeField.getContentAfter());
+                requireSingleRowUpdate(
+                        policyChangeDao.updateMasterField(
+                                policyNo,
+                                policySeq,
+                                PolicyChangeFieldName.INSURED_AMOUNT.getFieldName(),
+                                changeField.getContentAfter()
+                        ),
+                        "保單主檔保額回寫失敗"
+                );
                 continue;
             }
             if (isRideInsuredAmountField(changeField.getChangeField())) {
@@ -109,7 +146,10 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
                 if (!PolicyRideKey.MAIN.getRideOrder().equals(rideOrder)) {
                     throw new IllegalArgumentException("002 主約保額變更不可回寫附約: " + rideOrder);
                 }
-                policyChangeDao.updateRideAmount(policyNo, policySeq, rideOrder, changeField.getContentAfter());
+                requireSingleRowUpdate(
+                        policyChangeDao.updateRideAmount(policyNo, policySeq, rideOrder, changeField.getContentAfter()),
+                        "主約保額回寫失敗: " + rideOrder
+                );
                 continue;
             }
             if (isRidePremiumField(changeField.getChangeField())) {
@@ -117,7 +157,10 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
                 if (!PolicyRideKey.MAIN.getRideOrder().equals(rideOrder)) {
                     throw new IllegalArgumentException("002 主約變更不可回寫附約保費: " + rideOrder);
                 }
-                policyChangeDao.updateRidePremium(policyNo, policySeq, rideOrder, changeField.getContentAfter());
+                requireSingleRowUpdate(
+                        policyChangeDao.updateRidePremium(policyNo, policySeq, rideOrder, changeField.getContentAfter()),
+                        "主約保費回寫失敗: " + rideOrder
+                );
                 premiumChanged = true;
                 continue;
             }
@@ -131,6 +174,11 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
         if (changeFields.isEmpty()) {
             throw new IllegalStateException("找不到附約保額變更欄位: " + changeCaseNo);
         }
+        lockMaster(policyNo, policySeq);
+        Map<String, MainPolicyRide> rides = lockedRideMap(policyNo, policySeq);
+        for (PolicyChangeField changeField : changeFields) {
+            assertRideBeforeValue(rides, changeField);
+        }
         boolean premiumChanged = false;
         for (PolicyChangeField changeField : changeFields) {
             if (isRideInsuredAmountField(changeField.getChangeField())) {
@@ -138,7 +186,10 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
                 if (PolicyRideKey.MAIN.getRideOrder().equals(rideOrder)) {
                     throw new IllegalArgumentException("003 附約保額變更不可回寫主約");
                 }
-                policyChangeDao.updateRideAmount(policyNo, policySeq, rideOrder, changeField.getContentAfter());
+                requireSingleRowUpdate(
+                        policyChangeDao.updateRideAmount(policyNo, policySeq, rideOrder, changeField.getContentAfter()),
+                        "附約保額回寫失敗: " + rideOrder
+                );
                 continue;
             }
             if (isRidePremiumField(changeField.getChangeField())) {
@@ -146,7 +197,10 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
                 if (PolicyRideKey.MAIN.getRideOrder().equals(rideOrder)) {
                     throw new IllegalArgumentException("003 附約變更不可回寫主約保費");
                 }
-                policyChangeDao.updateRidePremium(policyNo, policySeq, rideOrder, changeField.getContentAfter());
+                requireSingleRowUpdate(
+                        policyChangeDao.updateRidePremium(policyNo, policySeq, rideOrder, changeField.getContentAfter()),
+                        "附約保費回寫失敗: " + rideOrder
+                );
                 premiumChanged = true;
                 continue;
             }
@@ -172,6 +226,100 @@ public class ChangeCaseApplyServiceImpl implements ChangeCaseApplyService {
 
     private boolean isRidePremiumField(String fieldName) {
         return RideChangeField.PREMIUM.matches(fieldName);
+    }
+
+    private MainPolicyMaster lockMaster(String policyNo, Integer policySeq) {
+        MainPolicyMaster master = policyChangeDao.findMasterForUpdate(policyNo, policySeq);
+        if (master == null) {
+            throw new ChangeCaseConflictException("保單主檔已不存在，請重新查詢");
+        }
+        return master;
+    }
+
+    private Map<String, MainPolicyRide> lockedRideMap(String policyNo, Integer policySeq) {
+        return policyChangeDao.findRidesForUpdate(policyNo, policySeq).stream()
+                .collect(Collectors.toMap(MainPolicyRide::getRideOrder, Function.identity()));
+    }
+
+    private void refreshMasterTotalPremium(String policyNo, Integer policySeq) {
+        requireSingleRowUpdate(
+                policyChangeDao.updateMasterTotalPremiumFromRides(policyNo, policySeq),
+                "保單總保費回寫失敗"
+        );
+    }
+
+    private void requireSingleRowUpdate(int updatedRows, String errorMessage) {
+        if (updatedRows != 1) {
+            throw new ChangeCaseConflictException(errorMessage);
+        }
+    }
+
+    private void assertAmountBeforeValue(
+            MainPolicyMaster master,
+            Map<String, MainPolicyRide> rides,
+            PolicyChangeField changeField
+    ) {
+        if (PolicyChangeFieldName.MASTER_INSURED_AMOUNT.getFieldName().equals(changeField.getChangeField())) {
+            assertAmountUnchanged(master.getInsuredAmount(), changeField, "保單主檔保額");
+            return;
+        }
+        assertRideBeforeValue(rides, changeField);
+    }
+
+    private void assertRideBeforeValue(Map<String, MainPolicyRide> rides, PolicyChangeField changeField) {
+        String rideOrder;
+        if (isRideInsuredAmountField(changeField.getChangeField())) {
+            rideOrder = resolveRideOrder(changeField);
+            MainPolicyRide ride = requireRide(rides, rideOrder);
+            assertAmountUnchanged(ride.getInsuredAmount(), changeField, "主附約保額 " + rideOrder);
+            return;
+        }
+        if (isRidePremiumField(changeField.getChangeField())) {
+            rideOrder = resolveRideOrder(changeField, RideChangeField.PREMIUM);
+            MainPolicyRide ride = requireRide(rides, rideOrder);
+            assertAmountUnchanged(ride.getPremium(), changeField, "主附約保費 " + rideOrder);
+            return;
+        }
+        throw new IllegalArgumentException("不支援的主附約異動欄位: " + changeField.getChangeField());
+    }
+
+    private MainPolicyRide requireRide(Map<String, MainPolicyRide> rides, String rideOrder) {
+        MainPolicyRide ride = rides.get(rideOrder);
+        if (ride == null) {
+            throw new ChangeCaseConflictException("主附約資料已不存在: " + rideOrder);
+        }
+        return ride;
+    }
+
+    private void assertMasterBeforeValue(MainPolicyMaster master, PolicyChangeField changeField) {
+        String fieldName = changeField.getChangeField();
+        String currentValue;
+        if (PolicyChangeFieldName.MAIN_PRODUCT_CODE.getFieldName().equals(fieldName)) {
+            currentValue = master.getMainProductCode();
+        } else if (PolicyChangeFieldName.MAIN_POLICY_YEARS.getFieldName().equals(fieldName)) {
+            currentValue = String.valueOf(master.getMainPolicyYears());
+        } else if (PolicyChangeFieldName.INSURED_AMOUNT.getFieldName().equals(fieldName)) {
+            assertAmountUnchanged(master.getInsuredAmount(), changeField, "保單主檔保額");
+            return;
+        } else {
+            throw new IllegalArgumentException("不支援回寫主檔欄位: " + fieldName);
+        }
+        if (!java.util.Objects.equals(normalizeBlank(currentValue), normalizeBlank(changeField.getContentBefore()))) {
+            throw new ChangeCaseConflictException("主檔資料已被其他案件修改: " + fieldName);
+        }
+    }
+
+    private void assertAmountUnchanged(
+            java.math.BigDecimal currentValue,
+            PolicyChangeField changeField,
+            String displayName
+    ) {
+        java.math.BigDecimal beforeValue = changeField.getContentBefore() == null
+                ? null
+                : new java.math.BigDecimal(changeField.getContentBefore());
+        if (!amountEquals(currentValue, beforeValue)) {
+            throw new ChangeCaseConflictException(displayName + " 已被其他案件修改，請重新建立變更");
+        }
     }
 
     private MainPolicyAddress readAddress(String contentAfter) {

@@ -78,6 +78,11 @@ public class CodeDescriptionServiceImpl implements CodeDescriptionService {
     }
 
     @Override
+    public String processingStatusCode() {
+        return acceptanceStatusCode(CodeDescriptionMeaning.PROCESSING_STATUS);
+    }
+
+    @Override
     public String completeStatusCode() {
         return acceptanceStatusCode(CodeDescriptionMeaning.COMPLETE_STATUS);
     }

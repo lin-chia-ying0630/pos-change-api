@@ -8,6 +8,7 @@ import com.alin.lin.service.ChangeCaseDraftService;
 import com.alin.lin.service.CodeDescriptionService;
 import com.alin.lin.service.PolicyChangeSupportService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -17,15 +18,12 @@ import static com.alin.lin.util.PolicyChangeFieldUtil.requireText;
 
 @Service
 public class ChangeCaseDraftServiceImpl implements ChangeCaseDraftService {
-    private static final int SERIAL_MAX = 999;
     private static final DateTimeFormatter MONTH_DAY_FORMATTER = DateTimeFormatter.ofPattern("MMdd");
 
     private final PolicyChangeDao policyChangeDao;
     private final PolicyChangeSupportService policyChangeSupportService;
     private final CodeDescriptionService codeDescriptionService;
     private final ZoneId changeCaseZoneId;
-    private String currentCaseNoPrefix;
-    private int currentCaseNoSerial;
 
     public ChangeCaseDraftServiceImpl(
             PolicyChangeDao policyChangeDao,
@@ -40,6 +38,7 @@ public class ChangeCaseDraftServiceImpl implements ChangeCaseDraftService {
     }
 
     @Override
+    @Transactional
     public CreateChangeCaseDto createChangeCase(CreateChangeCaseRequest request) {
         policyChangeSupportService.requirePolicy(request.getPolicyNo(), request.getPolicySeq());
         requireText(request.getChangeItem(), "changeItem");
@@ -55,32 +54,20 @@ public class ChangeCaseDraftServiceImpl implements ChangeCaseDraftService {
                 .build();
     }
 
-    private synchronized String generateChangeCaseNo() {
-        String prefix = buildTodayCaseNoPrefix();
-        if (!prefix.equals(currentCaseNoPrefix)) {
-            currentCaseNoPrefix = prefix;
-            currentCaseNoSerial = findLatestSerial(prefix);
+    private String generateChangeCaseNo() {
+        LocalDate today = LocalDate.now(changeCaseZoneId);
+        if (policyChangeDao.incrementCaseSequence(today) < 1) {
+            throw new IllegalStateException("更新變更案號流水號失敗");
         }
-
-        if (currentCaseNoSerial >= SERIAL_MAX) {
-            throw new IllegalStateException("今日變更案號流水號已達上限");
+        Long nextSerial = policyChangeDao.findLastInsertedSequence();
+        if (nextSerial == null || nextSerial < 1) {
+            throw new IllegalStateException("無法取得今日變更案號流水號");
         }
-
-        currentCaseNoSerial++;
-        return prefix + String.format("%03d", currentCaseNoSerial);
+        return buildCaseNoPrefix(today) + String.format("%03d", nextSerial);
     }
 
-    private String buildTodayCaseNoPrefix() {
-        LocalDate today = LocalDate.now(changeCaseZoneId);
+    private String buildCaseNoPrefix(LocalDate today) {
         int rocYear = today.getYear() - 1911;
         return "C" + String.format("%03d", rocYear) + today.format(MONTH_DAY_FORMATTER);
-    }
-
-    private int findLatestSerial(String prefix) {
-        String maxChangeCaseNo = policyChangeDao.findMaxChangeCaseNoByPrefix(prefix);
-        if (maxChangeCaseNo == null || maxChangeCaseNo.length() <= prefix.length()) {
-            return 0;
-        }
-        return Integer.parseInt(maxChangeCaseNo.substring(prefix.length()));
     }
 }

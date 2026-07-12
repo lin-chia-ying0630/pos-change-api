@@ -1,324 +1,205 @@
-# POS Change API 命名整理
+# POS Change API 保全變更後端
 
-## 命名原則
+`pos-change-api` 提供保單查詢、保全變更草稿、案件查詢與覆核回寫 API。前端可以先取得案號，但只有真的修改資料時，後端才建立受理檔與異動明細。
 
-後端命名要清楚表達所在層級與用途：
+## 功能流程
 
-- Entity：資料庫資料列模型。
-- DTO：join 其他欄位、畫面聚合資料、計算結果或操作結果。
-- Request DTO：所有 `@RequestBody` 的傳入資料，不直接使用 Entity。
-- DAO：資料存取封裝。
-- Mapper：MyBatis SQL 介面。
-- Response envelope：只使用 `ResponseBodyDto<T>`。
-
-共用 payload DTO 不應命名成 `*Response`，除非它真的代表回覆外層格式。
-
-## 分層命名
-
-### Controller
-
-Controller 只處理 HTTP 路由與回覆包裝。
-
-範例：
-
-- `PolicyChangeController`
-
-### Service
-
-Service 必須有介面與實作。
-
-範例：
-
-- `PolicyChangeService`
-- `PolicyChangeServiceImpl`
-
-商業規則放在 Service implementation。
-
-欄位正規化、差異比對與格式檢核應放在 `PolicyChangeFieldUtil`，不要散落在 Service implementation。
-
-### DAO
-
-DAO 是資料存取物件，不是 request 或 response payload。
-
-範例：
-
-- `PolicyChangeDao`
-- `PolicyChangeDaoImpl`
-
-DAO 建議使用介面與實作分離。Service 依賴 DAO interface，DAO implementation 再呼叫 Mapper 方法，讓 Service 不直接碰 SQL 存取細節。
-
-### Mapper
-
-Mapper 是 MyBatis mapper 介面與 XML SQL 檔。
-
-範例：
-
-- `PolicyChangeMapper`
-- `PolicyChangeMapper.xml`
-
-Entity 或 DTO 查詢優先使用 `resultType="完整類別名稱"`，搭配 `map-underscore-to-camel-case` 自動對應 SQL 欄位與 Java 欄位。
-
-join、別名欄位或聚合資料若 SQL alias 已對應 DTO 欄位，也使用 `resultType`。只有 `resultType` 無法表達特殊巢狀、複合物件或自訂對應時，才新增 `resultMap`。
-
-### Entity
-
-Entity 對應資料表資料列。
-
-範例：
-
-- `MainPolicyMaster`
-- `MainPolicyAddress`
-- `MainPolicyRide`
-- `PolicyChangeAcceptance`
-- `PolicyChangeItem`
-- `PolicyChangeField`
-- `PolicyChangeFile`
-- `CodeDescription`
-
-Entity 欄位應補上中文註解，方便對照 SQL 欄位與畫面欄位。
-
-## DTO 命名
-
-DTO 是 API 或 Service 層使用的資料模型。
-
-共用結果 DTO：
-
-- `PolicyDetailDto`
-- `CreateChangeCaseDto`
-- `AddressChangeDto`
-- `MainAmountChangeDto`
-- `PolicyChangeCaseDto`
-- `PostalCodeAreaDto`
-- `UpdateChangeCaseStatusDto`
-
-DTO 原則：
-
-- 除非是 join 其他欄位、畫面聚合資料、計算結果或操作結果，否則不新增 DTO。
-- `@RequestBody` 不直接使用 Entity，需建立 request DTO。
-- `@RequestBody` 參數需加 `@Valid`，Controller 類別需加 `@Validated`。
-- Request DTO 必填欄位需使用 Bean Validation，例如 `@NotBlank`、`@NotNull`、`@NotEmpty`。
-- API 回覆 data 若是一對一對應單一 SQL table row，可以直接使用 Entity，不再包裝 DTO。
-- `ResponseBodyDto<T>` 只負責外層回覆格式，`data` 依上面規則放 Entity 或 DTO。
-- DTO 欄位應補上中文註解，方便對照 request、response 與畫面欄位。
-
-Request body 一律使用 `*Request` DTO：
-
-- 產生案號：Body 使用 `CreateChangeCaseRequest`。
-- 地址變更：案號使用 path variable，Body 使用 `AddressChangeRequest`。
-- 主約保額變更：案號使用 path variable，Body 使用 `MainAmountChangeRequest`。
-- 附約保額變更：案號、保單號碼、序號使用 path variable，Body 使用 `RiderAmountChangeListRequest`。
-- 覆核狀態：案號使用 path variable，Body 使用 `UpdateChangeCaseStatusRequest`。
-
-回覆外層：
-
-- `ResponseBodyDto<T>`
-
-## Spring Security 與 CORS
-
-跨域設定統一放在 `SecurityConfig`，不要在 Controller 使用 `@CrossOrigin`。
-
-- `CorsConfigurationSource` 維護允許的前端來源。
-- `SecurityFilterChain` 啟用 CORS。
-- 目前 `/api/**` 不做登入驗證，維持 `permitAll`。
-- 前後端分離 API 關閉 CSRF。
-
-## 先前重新命名決策
-
-以下名稱不應再作為 response-only class 回來：
-
-- `PolicyDetailResponse`
-- `CreateChangeCaseResponse`
-- `AddressChangeResponse`
-
-請改用共用名稱：
-
-- `PolicyDetailDto`
-- `CreateChangeCaseDto`
-- `AddressChangeDto`
-
-先前提到的 `PolicyDetailList` 已整理為共用 DTO 命名，不應限定成只有 API 回覆用途。
-
-## DAO 與 DTO 區分
-
-DAO 與 DTO 職責不同：
-
-- DAO：透過 Mapper 與資料庫互動。
-- DTO：在 Controller、Service 與 Client 之間傳遞 request 或 result data。
-- Entity：代表資料庫資料表資料列。
-
-範例：
-
-- `PolicyChangeDao` 是 DAO interface。
-- `PolicyChangeDaoImpl` 是 DAO implementation，注入 `PolicyChangeMapper`。
-- `PolicyChangeMapper` 是 MyBatis mapper，由 MyBatis 產生代理實作，不手動 `implements` DAO。
-- `MainPolicyMaster` 是 Entity，因為它對應資料表資料列。
-
-## Lombok 標準
-
-DTO 與 Entity 應使用 Lombok 讓程式碼簡潔：
-
-```java
-@Builder
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
+```mermaid
+flowchart LR
+    A["查詢保單"] --> B["選擇 001 / 002 / 003"]
+    B --> C["資料庫原子取得案號"]
+    C --> D{"是否真的異動"}
+    D -->|否| E["不建立受理資料"]
+    D -->|是| F["建立 P-受理中草稿"]
+    F --> G["覆核先查看異動前後值"]
+    G --> H{"覆核結果"}
+    H -->|完成| I["P → A → 套用 → S"]
+    H -->|取消| J["P → C，不套用"]
 ```
 
-新增 DTO 與 Entity 時維持此標準，除非有框架需求或刻意設計成不可變模型。
+### 變更項目
 
-## CodeDescription 與 Enum 命名
+- `001`：地址、email、電話或手機變更。
+- `002`：主約保額變更，同時記錄保單主檔與主約列。
+- `003`：附約保額變更，以 `rideOrder` 定位正確附約。
 
-`code_description` 已管理的業務代碼不再另外建立 enum，避免資料庫與 Java 重複維護。
+### 受理狀態
 
-例如以下代碼應由 `CodeDescription` 取得 `code_before`：
+- `P`：受理中，等待覆核。
+- `A`：覆核交易套用中，只供後端原子鎖定使用。
+- `S`：完成，異動已回寫。
+- `C`：取消，異動不回寫。
 
-- 地址型態，例如通訊地址。
-- 保全變更項目，例如地址變更、主約保額變更、附約保額變更。
-- 受理狀態，例如受理中、完成、取消。
-- 附約型態，例如主約。
+覆核完成使用條件更新將 `P` 改成 `A`。只有成功鎖定案件的交易能套用資料，再將 `A` 改成 `S`，可避免兩位覆核人員同時完成同一案件。
 
-目前 enum 與 properties 分工：
+## 案號規則
 
-- `CodeTable`：共用代碼檔查詢用的 `code_group` 與 `code_field`，不存放實際代碼值。
-- `CodeDescriptionMeaning`：定義系統要查找的穩定代碼 key，例如 `CHANGE_ITEM/001`，不依賴中文 `code_description`。
-- `PolicyChangeFieldName`：保全異動欄位名稱與主檔可回寫欄位白名單。
-- `RideChangeField`：主附約保額、保費異動欄位的組合與解析規則。
-- `PolicyRideKey`：主約列判斷用的附約序號。
-- `PosChangeProperties`：只讀取環境相關設定，目前為案號日期時區。
-- `PostalCodeRule`：郵遞區號檢核規則。
+格式為：
 
-新增固定業務代碼時優先補 `code_description`；程式判斷使用穩定代碼 key，不使用中文描述當查詢條件。只有欄位白名單、regex、欄位組合規則這類非 code table 資料才放 enum。
-
-## 商業 Key 命名
-
-`policy_change_field.change_key` 用來記錄目標資料列 key。當同一張保單有多筆相關資料時，靠它定位要回寫哪一筆：
-
-- 地址變更 `001`：`change_key = address_type`。
-- 地址型態 `01/02`：郵遞區號與地址必填；`email / 電話 / 手機` 欄位鎖住且不列入異動。
-- 地址型態 `11/12/31`：`email / 電話 / 手機` 必填；郵遞區號與地址可空白且不列入異動。
-- 聯絡資料若歷史資料同時存在 `full_width_address` 與 `half_width_address`，後端以畫面顯示的有效聯絡值判斷是否異動；畫面未修改時不可建立異動欄位。
-- 主約保額變更 `002`：主檔用 `change_key = MASTER`，主約附約列用 `change_key = 000`。
-- 附約保額變更 `003`：`change_key = ride_order`。
-
-這可以避免把儲存的變更套用到錯誤地址或錯誤附約保額。
-
-## API 與畫面註解
-
-Controller 的每一支 API 方法上方都應保留簡短註解，標示該 API 對應的前端畫面或 Dialog，例如：
-
-- 新增保全變更頁。
-- 地址變更 Dialog。
-- 查詢保全變更頁。
-- 覆核頁。
-
-註解重點是畫面對應與使用時機，不需要描述每一行程式做什麼。
-
-## 地址與總保費命名
-
-- `PostalCodeAreaDto.addressPrefix`：中文地址前綴。
-- `PostalCodeAreaDto.halfWidthAddressPrefix`：保留相容舊欄位，地址變更畫面不再寫入 `email / 電話 / 手機`。
-- `main_policy_master.premium`：總保費，不是可直接手動修改的主檔保費。
-- `main_policy_ride.premium`：主附約各列保費，總保費由這些資料列加總回寫。
-
-## 變更項目命名
-
-商業代碼維持字串：
-
-- `001`：地址變更。
-- `002`：主約保額變更。
-- `003`：附約保額變更。
-
-除非資料庫與前端一起調整，否則不要在 request 或資料庫 payload 中改成 enum 名稱。
-
-## 狀態命名
-
-受理狀態維持大寫字串：
-
-- `P`：受理中。
-- `S`：完成。
-- `C`：取消。
-
-新增流程只產生 `P`。
-
-覆核流程負責將 `P` 改為 `S` 或 `C`。
-
-## 環境設定
-
-案號日期時區由 `application.properties` 的 `pos.change-case.zone-id` 控制，預設讀取環境變數：
-
-```properties
-pos.change-case.zone-id=${CHANGE_CASE_ZONE_ID:Asia/Taipei}
+```text
+C + 民國年 3 碼 + 月 2 碼 + 日 2 碼 + 流水號至少 3 碼
 ```
 
-未設定 `CHANGE_CASE_ZONE_ID` 時使用 `Asia/Taipei`。
+例如 `C1150712001`。流水號由 `policy_change_case_sequence` 使用 MySQL 原子遞增與 connection-local `LAST_INSERT_ID()` 取得，支援多執行緒、多 Pod 與服務重啟；超過 `999` 後會自然成長為四碼以上。
 
-業務代碼與欄位規則不要放在 `application.properties`：
+取號只保留流水號，不會建立 `policy_change_acceptance`。實際儲存且有異動時才建立受理資料。
 
-- 代碼值與顯示文字放 `code_description`。
-- 查詢哪一組代碼由 `CodeTable` 定義。
-- 欄位名稱、欄位白名單、主附約欄位組合由 enum 定義。
+## 草稿規則
 
-## SQL Log 與個資遮罩
+`policy_change_field` 與 `policy_change_file` 使用商業唯一鍵保存目前有效草稿：
 
-不要開啟 MyBatis `StdOutImpl`，因為它會原樣印出 `Parameters`，可能包含保單號碼、email、電話、手機或地址：
+- 欄位草稿：案號、項目、欄位名稱與 `change_key` 唯一。
+- 檔案快照：案號、項目、檔案名稱與 `change_key` 唯一。
+- 重複儲存同一目標會更新最新值，不會累積多筆有效版本。
+- 改回原值時會刪除該目標草稿；案件已無任何異動時，一併移除受理資料。
+
+`change_key` 用來定位資料列：
+
+- 地址：`address_type`。
+- 主檔：`MASTER`。
+- 主約列：`000`。
+- 附約：`ride_order`。
+
+## 覆核衝突
+
+覆核套用前會比較主檔目前值與草稿的 `content_before`：
+
+- 值相同才允許套用。
+- 比較與回寫期間使用 `SELECT ... FOR UPDATE` 鎖定目標資料列；主附約固定先鎖主檔、再依序鎖附約。
+- 若其他案件已先修改同一地址、主約或附約，回傳 HTTP `409 Conflict`。
+- 每次回寫都檢查 affected row 必須為 1，避免資料不存在時仍顯示完成。
+- 整個覆核在同一交易內執行；任何一項失敗都會回復案件狀態與主檔更新。
+
+## API
+
+所有成功與錯誤回覆都使用 `ResponseBodyDto<T>`；request body 不包 `ResponseBodyDto`。
+
+| API | 畫面 | 用途 |
+| --- | --- | --- |
+| `GET /api/auth/me` | 登入頁 | 驗證帳號並取得 MAKER / REVIEWER 角色。 |
+| `GET /api/policies/{policyNo}/{policySeq}` | 新增頁 | 查詢主檔、地址、主附約與代碼。 |
+| `GET /api/postal-codes/{postalCode}` | 地址 Dialog | 查詢 3 或 3+3 郵遞區號地址前綴。 |
+| `POST /api/change-cases` | 新增頁 | 原子取得案號，不建立受理資料。 |
+| `POST /api/change-cases/{caseNo}/address-change` | 001 Dialog | 儲存地址或聯絡資料草稿。 |
+| `POST /api/change-cases/{caseNo}/main-amount-change` | 002 Dialog | 儲存主約保額草稿。 |
+| `POST /api/change-cases/{caseNo}/policies/{policyNo}/{seq}/rider-amount-change` | 003 Dialog | 儲存附約保額草稿。 |
+| `GET /api/policies/{policyNo}/change-cases` | 查詢／覆核頁 | 查詢案件清單。 |
+| `GET /api/policies/{policyNo}/{seq}/change-cases/{caseNo}` | 查詢／覆核頁 | 查詢欄位與檔案快照異動前後值。 |
+| `PATCH /api/change-cases/{caseNo}/status` | 覆核頁 | REVIEWER 將案件改成 `S` 或 `C`。 |
+
+## 架構
+
+```mermaid
+flowchart TD
+    A["PolicyChangeController"] --> B["PolicyChangeService facade"]
+    B --> C["PolicyQueryService"]
+    B --> D["ChangeCaseDraftService"]
+    B --> E["AddressChangeSaveService"]
+    B --> F["AmountChangeSaveService"]
+    B --> G["ChangeCaseReviewService"]
+    G --> H["ChangeCaseApplyService"]
+    C --> I["PolicyChangeDao"]
+    D --> I
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    I --> J["PolicyChangeDao.xml / MyBatis"]
+    J --> K["MySQL"]
+```
+
+後端維持三層：
+
+- Controller：HTTP、Bean Validation 與 `ResponseBodyDto`。
+- Service：use case、交易與商業規則；每個 Service 都有 interface。
+- DAO：`PolicyChangeDao` 由 MyBatis 直接建立代理，不再保留純轉呼叫的 DAO implementation 與 Mapper interface。
+
+`PolicyChangeServiceImpl` 是薄 facade，不重複實作各 use case。
+
+## 資料庫版本
+
+資料庫結構由 Flyway 管理：
+
+- `db/migration/V1__baseline.sql`：核心資料表、代碼與郵遞區號。
+- `db/migration/V2__harden_change_case_workflow.sql`：原子流水號、草稿唯一鍵與更新時間。
+- `db/local/R__demo_policy.sql`：只在 `local` profile 建立示範保單。
+
+正式環境不要手動重跑舊 `schema.sql`。資料庫本身需先建立，啟動時由 Flyway 套用尚未執行的版本。
+
+## Security 與 CORS
+
+本機預設可設定 `POS_SECURITY_ENABLED=false`。正式環境使用 `prod` profile，必須設定：
+
+```text
+POS_SECURITY_ENABLED=true
+POS_MAKER_USERNAME
+POS_MAKER_PASSWORD
+POS_REVIEWER_USERNAME
+POS_REVIEWER_PASSWORD
+```
+
+- `MAKER`：查詢、取號、儲存 001／002／003。
+- `REVIEWER`：查詢案件明細、完成或取消案件。
+- 未登入回覆 `401 ResponseBodyDto`，角色不符回覆 `403 ResponseBodyDto`。
+- CORS 來源由 `CORS_ALLOWED_ORIGINS` 以逗號分隔設定。
+
+資料庫帳密沒有程式預設值，必須由環境變數或 Secret 提供：
+
+```text
+DB_URL
+DB_USERNAME
+DB_PASSWORD
+```
+
+## 本機啟動
+
+```bash
+export SPRING_PROFILES_ACTIVE=local
+export DB_URL='jdbc:mysql://localhost:3306/main?serverTimezone=Asia/Taipei&characterEncoding=utf-8'
+export DB_USERNAME='your-user'
+export DB_PASSWORD='your-password'
+mvn spring-boot:run
+```
+
+預設 API：`http://localhost:8081`。
+
+健康檢查：
+
+```text
+GET /actuator/health/liveness
+GET /actuator/health/readiness
+```
+
+## 測試與 CI
+
+```bash
+mvn test
+mvn clean verify
+```
+
+- 一般單元測試不連本機 MySQL。
+- `SecurityAuthorizationTest` 驗證 401/403 `ResponseBodyDto`、MAKER/REVIEWER 分權、登入身份與 CORS origin。
+- `PolicyChangeWorkflowIntegrationTest` 使用 MySQL Testcontainers 驗證 Flyway、原子案號、無異動、重複儲存、過期案件及兩案同時覆核衝突。
+- Docker 未啟動時整合測試會略過；GitHub Actions 的 Docker 環境會完整執行。
+- `.github/workflows/ci.yml` 在 push 與 pull request 執行 `mvn clean verify`。
+
+## Docker
+
+```bash
+docker build -t pos-change-api:latest .
+```
+
+Dockerfile 使用 BuildKit cache 保存 Maven 本機倉庫，直接執行專案建置；不先跑 `dependency:go-offline`，避免下載未使用的 BOM 與外部資料庫驅動。
+
+前後端與 MySQL 建議由 `pos-web/compose.yaml` 一起啟動，避免 port、network 與資料庫環境設定不一致。
+
+## SQL Log 與個資
+
+MyBatis 原始參數 log 維持關閉：
 
 ```properties
 mybatis.configuration.log-impl=org.apache.ibatis.logging.nologging.NoLoggingImpl
-# mybatis.configuration.log-impl=org.apache.ibatis.logging.stdout.StdOutImpl
-logging.level.com.alin.lin.mapper=info
+logging.level.com.alin.lin.dao=info
 ```
 
-Debug console 看 SQL 時，統一使用 `MaskedSqlLogInterceptor`：
-
-```properties
-logging.level.com.alin.lin.interceptor.MaskedSqlLogInterceptor=debug
-```
-
-`logback-spring.xml` 會同時輸出到 console 與檔案：
-
-```text
-logs/pos-change-api.log
-logs/pos-change-api.2026-07-12.0.log.gz
-```
-
-查目前 log：
-
-```bash
-tail -f logs/pos-change-api.log
-```
-
-查歷史遮罩 SQL log：
-
-```bash
-zgrep "Masked parameters" logs/pos-change-api.*.log.gz
-```
-
-檔案保留規則：
-
-- 每天切檔。
-- 單檔超過 100MB 會再切序號。
-- 保留 30 天。
-- 總容量上限 3GB。
-
-若要調整 log 存放路徑，可設定環境變數：
-
-```bash
-LOG_PATH=/var/log/pos-change-api
-```
-
-輸出會包含 SQL id、SQL 與遮罩後參數，例如：
-
-```text
-SQL id: com.alin.lin.mapper.PolicyChangeMapper.findMaster
-SQL: SELECT ... WHERE policy_no = ? AND policy_seq = ?
-Masked parameters: [policyNo=P00***001, policySeq=1]
-```
-
-遮罩規則集中在 `MaskedSqlLogInterceptor.maskValue`，並優先依壽險常見欄位名稱判斷：
-
-- `policyNo` / `policy_no`：保單號碼保留前 3 碼與後 3 碼。
-- `fullWidthAddress` / `halfWidthAddress` / `address` / `add`：地址保留前 6 個字，其餘遮蔽。
-- `tel` / `phone` / `mobile` / `cell`：電話、手機保留前 3 碼與後 3 碼。
-- `email`：保留第一碼與 domain。
-
-新增敏感欄位時應優先補測試。
+Debug SQL 統一由 `MaskedSqlLogInterceptor` 輸出，保單號碼、地址、email、電話與手機會遮罩。Log 同時輸出 stdout 與 rolling file；容器或 K8s 應以 stdout 收集為主。

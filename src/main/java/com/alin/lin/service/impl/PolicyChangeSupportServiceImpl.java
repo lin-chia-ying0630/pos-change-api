@@ -48,10 +48,10 @@ public class PolicyChangeSupportServiceImpl implements PolicyChangeSupportServic
 
     @Override
     public void ensureChangeCaseSaved(String policyNo, Integer policySeq, String changeCaseNo, String changeItem) {
-        if (policyChangeDao.existsChangeItem(policyNo, policySeq, changeCaseNo, changeItem)) {
+        if (policyChangeDao.existsChangeItem(policyNo, policySeq, changeCaseNo, changeItem) > 0) {
             return;
         }
-        if (policyChangeDao.existsChangeCaseNo(changeCaseNo)) {
+        if (policyChangeDao.existsChangeCaseNo(changeCaseNo) > 0) {
             throw new IllegalArgumentException("變更案號已存在: " + changeCaseNo);
         }
         policyChangeDao.insertAcceptance(PolicyChangeAcceptance.builder()
@@ -69,8 +69,8 @@ public class PolicyChangeSupportServiceImpl implements PolicyChangeSupportServic
     }
 
     @Override
-    public void insertFieldChange(String policyNo, Integer policySeq, String changeCaseNo, String changeItem, FieldChange fieldChange) {
-        policyChangeDao.insertChangeField(
+    public void upsertFieldChange(String policyNo, Integer policySeq, String changeCaseNo, String changeItem, FieldChange fieldChange) {
+        policyChangeDao.upsertChangeField(
                 policyNo,
                 policySeq,
                 changeCaseNo,
@@ -80,5 +80,24 @@ public class PolicyChangeSupportServiceImpl implements PolicyChangeSupportServic
                 fieldChange.beforeValue(),
                 fieldChange.afterValue()
         );
+    }
+
+    @Override
+    public void removeEmptyChangeItemAndAcceptance(String policyNo, Integer policySeq, String changeCaseNo, String changeItem) {
+        int fieldCount = policyChangeDao.countChangeFieldsByItem(policyNo, policySeq, changeCaseNo, changeItem);
+        int fileCount = policyChangeDao.countChangeFilesByItem(policyNo, policySeq, changeCaseNo, changeItem);
+        if (fieldCount > 0 || fileCount > 0) {
+            return;
+        }
+
+        policyChangeDao.deleteChangeItem(policyNo, policySeq, changeCaseNo, changeItem);
+        if (policyChangeDao.countChangeItemsByCaseNo(policyNo, policySeq, changeCaseNo) == 0) {
+            policyChangeDao.deleteAcceptance(
+                    policyNo,
+                    policySeq,
+                    changeCaseNo,
+                    codeDescriptionService.pendingStatusCode()
+            );
+        }
     }
 }

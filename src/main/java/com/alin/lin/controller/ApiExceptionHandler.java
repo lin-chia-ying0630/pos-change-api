@@ -1,6 +1,7 @@
 package com.alin.lin.controller;
 
 import com.alin.lin.dto.ResponseBodyDto;
+import com.alin.lin.exception.ChangeCaseConflictException;
 import com.alin.lin.util.ResponseUtil;
 import jakarta.validation.ConstraintViolationException;
 import org.mybatis.spring.MyBatisSystemException;
@@ -56,6 +57,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<ResponseBodyDto<Void>> handleNotFound(NoSuchElementException exception) {
         return ResponseUtil.notFound(exception.getMessage());
+    }
+
+    @ExceptionHandler(ChangeCaseConflictException.class)
+    public ResponseEntity<ResponseBodyDto<Void>> handleConflict(ChangeCaseConflictException exception) {
+        return ResponseUtil.conflict(exception.getMessage());
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

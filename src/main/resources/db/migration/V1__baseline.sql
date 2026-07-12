@@ -1,14 +1,8 @@
-CREATE DATABASE IF NOT EXISTS `main`
-    DEFAULT CHARACTER SET utf8mb4
-    DEFAULT COLLATE utf8mb4_unicode_ci;
-
-USE `main`;
-
 CREATE TABLE IF NOT EXISTS main_policy_master (
     policy_no VARCHAR(10) NOT NULL,
-    policy_seq INT(3) NOT NULL,
+    policy_seq INT NOT NULL,
     main_product_code VARCHAR(4) NOT NULL,
-    main_policy_years INT(2) NOT NULL,
+    main_policy_years INT NOT NULL,
     insured_amount DECIMAL(10, 2) NOT NULL,
     premium DECIMAL(17, 4) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -18,7 +12,7 @@ CREATE TABLE IF NOT EXISTS main_policy_master (
 
 CREATE TABLE IF NOT EXISTS main_policy_address (
     policy_no VARCHAR(10) NOT NULL,
-    policy_seq INT(3) NOT NULL,
+    policy_seq INT NOT NULL,
     address_type VARCHAR(2) NOT NULL,
     zip_code3 VARCHAR(3),
     zip_code2 VARCHAR(3),
@@ -34,11 +28,11 @@ CREATE TABLE IF NOT EXISTS main_policy_address (
 
 CREATE TABLE IF NOT EXISTS main_policy_ride (
     policy_no VARCHAR(10) NOT NULL,
-    policy_seq INT(3) NOT NULL,
+    policy_seq INT NOT NULL,
     ride_type VARCHAR(1) NOT NULL,
     ride_order VARCHAR(3) NOT NULL,
     product_code VARCHAR(4) NOT NULL,
-    policy_years INT(2) NOT NULL,
+    policy_years INT NOT NULL,
     insured_amount DECIMAL(10, 2) NOT NULL,
     premium DECIMAL(17, 4) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -51,7 +45,7 @@ CREATE TABLE IF NOT EXISTS main_policy_ride (
 
 CREATE TABLE IF NOT EXISTS policy_change_acceptance (
     policy_no VARCHAR(10) NOT NULL,
-    policy_seq INT(3) NOT NULL,
+    policy_seq INT NOT NULL,
     change_case_no VARCHAR(20) NOT NULL,
     acceptance_status VARCHAR(1) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -64,7 +58,7 @@ CREATE TABLE IF NOT EXISTS policy_change_acceptance (
 
 CREATE TABLE IF NOT EXISTS policy_change_item (
     policy_no VARCHAR(10) NOT NULL,
-    policy_seq INT(3) NOT NULL,
+    policy_seq INT NOT NULL,
     change_case_no VARCHAR(20) NOT NULL,
     change_item VARCHAR(3) NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -77,7 +71,7 @@ CREATE TABLE IF NOT EXISTS policy_change_item (
 CREATE TABLE IF NOT EXISTS policy_change_field (
     id BIGINT NOT NULL AUTO_INCREMENT,
     policy_no VARCHAR(10) NOT NULL,
-    policy_seq INT(3) NOT NULL,
+    policy_seq INT NOT NULL,
     change_case_no VARCHAR(20) NOT NULL,
     change_item VARCHAR(3) NOT NULL,
     change_field VARCHAR(64) NOT NULL,
@@ -94,7 +88,7 @@ CREATE TABLE IF NOT EXISTS policy_change_field (
 CREATE TABLE IF NOT EXISTS policy_change_file (
     id BIGINT NOT NULL AUTO_INCREMENT,
     policy_no VARCHAR(10) NOT NULL,
-    policy_seq INT(3) NOT NULL,
+    policy_seq INT NOT NULL,
     change_case_no VARCHAR(20) NOT NULL,
     change_item VARCHAR(3) NOT NULL,
     change_file VARCHAR(64) NOT NULL,
@@ -134,10 +128,10 @@ VALUES
     ('policy-change-acceptance', 'acceptance_status', 'C', NULL, '取消'),
     ('policy-change-item', 'change_item', '001', NULL, '地址變更'),
     ('policy-change-item', 'change_item', '002', NULL, '主保額變更'),
-    ('policy-change-item', 'change_item', '003', NULL, '附約保額變更')
+    ('policy-change-item', 'change_item', '003', NULL, '附約保額變更') AS incoming
 ON DUPLICATE KEY UPDATE
-    code_after = VALUES(code_after),
-    code_description = VALUES(code_description);
+    code_after = incoming.code_after,
+    code_description = incoming.code_description;
 
 INSERT INTO code_description (code_group, code_field, code_before, code_after, code_description)
 VALUES
@@ -507,55 +501,7 @@ VALUES
     ('postal-code', 'zip_code3', '979', '花蓮縣|萬榮鄉', 'Wanrong Township, Hualien County'),
     ('postal-code', 'zip_code3', '981', '花蓮縣|玉里鎮', 'Yuli Township, Hualien County'),
     ('postal-code', 'zip_code3', '982', '花蓮縣|卓溪鄉', 'Zhuoxi Township, Hualien County'),
-    ('postal-code', 'zip_code3', '983', '花蓮縣|富里鄉', 'Fuli Township, Hualien County')
+    ('postal-code', 'zip_code3', '983', '花蓮縣|富里鄉', 'Fuli Township, Hualien County') AS incoming
 ON DUPLICATE KEY UPDATE
-    code_after = VALUES(code_after),
-    code_description = VALUES(code_description);
-
-INSERT INTO main_policy_master (policy_no, policy_seq, main_product_code, main_policy_years, insured_amount, premium)
-VALUES ('P000000001', 1, 'LIFE', 20, 1000000.00, 15925.9089)
-ON DUPLICATE KEY UPDATE
-    main_product_code = VALUES(main_product_code),
-    main_policy_years = VALUES(main_policy_years),
-    insured_amount = VALUES(insured_amount),
-    premium = VALUES(premium);
-
-INSERT INTO main_policy_address (policy_no, policy_seq, address_type, zip_code3, zip_code2, full_width_address, half_width_address)
-VALUES ('P000000001', 1, '01', '100', '001', '臺北市中正區重慶南路一段１號', 'No.1, Sec.1, Chongqing S. Rd., Zhongzheng Dist., Taipei City')
-ON DUPLICATE KEY UPDATE
-    zip_code3 = VALUES(zip_code3),
-    zip_code2 = VALUES(zip_code2),
-    full_width_address = VALUES(full_width_address),
-    half_width_address = VALUES(half_width_address);
-
-INSERT INTO main_policy_address (policy_no, policy_seq, address_type, zip_code3, zip_code2, full_width_address, half_width_address)
-VALUES
-    ('P000000001', 1, '02', '104', '001', '臺北市中山區南京東路二段１００號', 'No.100, Sec.2, Nanjing E. Rd., Zhongshan Dist., Taipei City'),
-    ('P000000001', 1, '31', NULL, NULL, 'policyholder@example.com', 'policyholder@example.com')
-ON DUPLICATE KEY UPDATE
-    zip_code3 = VALUES(zip_code3),
-    zip_code2 = VALUES(zip_code2),
-    full_width_address = VALUES(full_width_address),
-    half_width_address = VALUES(half_width_address);
-
-INSERT INTO main_policy_ride (policy_no, policy_seq, ride_type, ride_order, product_code, policy_years, insured_amount, premium)
-VALUES
-    ('P000000001', 1, '1', '000', 'LIFE', 20, 1000000.00, 12345.6789),
-    ('P000000001', 1, '2', '001', 'ADDR', 20, 500000.00, 2345.6700),
-    ('P000000001', 1, '3', '002', 'FAMI', 20, 300000.00, 1234.5600)
-ON DUPLICATE KEY UPDATE
-    ride_type = VALUES(ride_type),
-    product_code = VALUES(product_code),
-    policy_years = VALUES(policy_years),
-    insured_amount = VALUES(insured_amount),
-    premium = VALUES(premium);
-
-UPDATE main_policy_master master
-SET premium = (
-    SELECT COALESCE(SUM(ride.premium), 0)
-    FROM main_policy_ride ride
-    WHERE ride.policy_no = master.policy_no
-      AND ride.policy_seq = master.policy_seq
-)
-WHERE policy_no = 'P000000001'
-  AND policy_seq = 1;
+    code_after = incoming.code_after,
+    code_description = incoming.code_description;

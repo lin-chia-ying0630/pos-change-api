@@ -11,5 +11,7 @@ public interface PolicyChangeSupportService {
 
     void ensureChangeCaseSaved(String policyNo, Integer policySeq, String changeCaseNo, String changeItem);
 
-    void insertFieldChange(String policyNo, Integer policySeq, String changeCaseNo, String changeItem, FieldChange fieldChange);
+    void upsertFieldChange(String policyNo, Integer policySeq, String changeCaseNo, String changeItem, FieldChange fieldChange);
+
+    void removeEmptyChangeItemAndAcceptance(String policyNo, Integer policySeq, String changeCaseNo, String changeItem);
 }

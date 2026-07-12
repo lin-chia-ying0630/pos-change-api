@@ -27,6 +27,8 @@ public interface CodeDescriptionService {
 
     String pendingStatusCode();
 
+    String processingStatusCode();
+
     String completeStatusCode();
 
     String cancelStatusCode();

@@ -30,6 +30,9 @@ public class PolicyChangeFile {
     // 異動檔案名稱
     private String changeFile;
 
+    // 目標資料列鍵值，例如地址型態。
+    private String changeKey;
+
     // 異動前檔案快照
     private String contentBefore;
 
@@ -38,4 +41,7 @@ public class PolicyChangeFile {
 
     // 建立時間
     private LocalDateTime createdAt;
+
+    // 最後更新時間
+    private LocalDateTime updatedAt;
 }

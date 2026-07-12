@@ -41,4 +41,7 @@ public class PolicyChangeField {
 
     // 建立時間
     private LocalDateTime createdAt;
+
+    // 最後更新時間
+    private LocalDateTime updatedAt;
 }
