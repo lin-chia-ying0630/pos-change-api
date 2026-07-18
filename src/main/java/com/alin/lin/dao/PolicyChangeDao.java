@@ -6,6 +6,8 @@ import com.alin.lin.entity.MainPolicyAddress;
 import com.alin.lin.entity.MainPolicyMaster;
 import com.alin.lin.entity.MainPolicyRide;
 import com.alin.lin.entity.PolicyChangeAcceptance;
+import com.alin.lin.entity.PolicyChangeCaseReservation;
+import com.alin.lin.entity.PolicyChangeCaseReservationItem;
 import com.alin.lin.entity.PolicyChangeField;
 import com.alin.lin.entity.PolicyChangeFile;
 import com.alin.lin.entity.PolicyChangeItem;
@@ -44,6 +46,8 @@ public interface PolicyChangeDao {
 
     List<CodeDescription> findCodes(@Param("codeGroup") String codeGroup, @Param("codeField") String codeField);
 
+    List<CodeDescription> findCodesByGroup(@Param("codeGroup") String codeGroup);
+
     CodeDescription findCode(@Param("codeGroup") String codeGroup,
                              @Param("codeField") String codeField,
                              @Param("codeBefore") String codeBefore);
@@ -52,13 +56,31 @@ public interface PolicyChangeDao {
 
     Long findLastInsertedSequence();
 
-    int existsChangeCaseNo(@Param("changeCaseNo") String changeCaseNo);
+    int insertCaseReservation(PolicyChangeCaseReservation reservation);
+
+    int insertCaseReservationItem(PolicyChangeCaseReservationItem reservationItem);
+
+    PolicyChangeCaseReservation findCaseReservationForUpdate(@Param("changeCaseNo") String changeCaseNo);
+
+    List<String> findReservedChangeItems(@Param("changeCaseNo") String changeCaseNo);
+
+    int consumeCaseReservation(@Param("changeCaseNo") String changeCaseNo,
+                               @Param("reservedBy") String reservedBy);
 
     List<PolicyChangeCaseDto> findChangeCases(@Param("policyNo") String policyNo);
 
     PolicyChangeCaseDto findChangeCase(@Param("policyNo") String policyNo,
                                        @Param("policySeq") Integer policySeq,
                                        @Param("changeCaseNo") String changeCaseNo);
+
+    // 依保單與保全變更項目取得最近一筆已受理案件，供申請資格檢核。
+    PolicyChangeCaseDto findLatestChangeCaseByItem(@Param("policyNo") String policyNo,
+                                                    @Param("policySeq") Integer policySeq,
+                                                    @Param("changeItem") String changeItem);
+
+    PolicyChangeAcceptance findAcceptanceForUpdate(@Param("policyNo") String policyNo,
+                                                    @Param("policySeq") Integer policySeq,
+                                                    @Param("changeCaseNo") String changeCaseNo);
 
     List<String> findChangeItemsByCaseNo(@Param("policyNo") String policyNo,
                                          @Param("policySeq") Integer policySeq,
@@ -155,11 +177,6 @@ public interface PolicyChangeDao {
                                         @Param("expectedStatus") String expectedStatus);
 
     int updateAddress(MainPolicyAddress address);
-
-    int updateMasterField(@Param("policyNo") String policyNo,
-                          @Param("policySeq") Integer policySeq,
-                          @Param("changeField") String changeField,
-                          @Param("contentAfter") String contentAfter);
 
     int updateRideAmount(@Param("policyNo") String policyNo,
                          @Param("policySeq") Integer policySeq,

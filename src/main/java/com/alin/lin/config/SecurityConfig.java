@@ -6,16 +6,24 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.provisioning.JdbcUserDetailsManager;
+import org.springframework.context.annotation.Profile;
+import javax.sql.DataSource;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -29,15 +37,18 @@ public class SecurityConfig {
     private final PosCorsProperties corsProperties;
     private final PosSecurityProperties securityProperties;
     private final ObjectMapper objectMapper;
+    private final Environment environment;
 
     public SecurityConfig(
             PosCorsProperties corsProperties,
             PosSecurityProperties securityProperties,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            Environment environment
     ) {
         this.corsProperties = corsProperties;
         this.securityProperties = securityProperties;
         this.objectMapper = objectMapper;
+        this.environment = environment;
     }
 
     @Bean
@@ -48,14 +59,22 @@ public class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable);
 
         if (!securityProperties.isEnabled()) {
+            if (!environment.acceptsProfiles(Profiles.of("local", "test"))) {
+                throw new IllegalStateException("POS Security 只能在 local 或 test profile 關閉");
+            }
             return http
                     .httpBasic(AbstractHttpConfigurer::disable)
                     .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                     .build();
         }
 
+        if (securityProperties.isRequireHttps()) {
+            http.requiresChannel(channel -> channel.anyRequest().requiresSecure());
+        }
+
         return http
                 .httpBasic(basic -> {})
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, exception) ->
                                 writeSecurityError(response, HttpServletResponse.SC_UNAUTHORIZED, "尚未登入或帳號密碼錯誤"))
@@ -74,12 +93,24 @@ public class SecurityConfig {
     }
 
     @Bean
+    @Profile({"local", "test"})
     @ConditionalOnProperty(prefix = "pos.security", name = "enabled", havingValue = "true")
     public UserDetailsService userDetailsService() {
-        requireCredential(securityProperties.getMakerUsername(), "POS_MAKER_USERNAME");
-        requireCredential(securityProperties.getMakerPassword(), "POS_MAKER_PASSWORD");
-        requireCredential(securityProperties.getReviewerUsername(), "POS_REVIEWER_USERNAME");
-        requireCredential(securityProperties.getReviewerPassword(), "POS_REVIEWER_PASSWORD");
+        requireCredentialPair(
+                securityProperties.getMakerUsername(),
+                securityProperties.getMakerPassword(),
+                "POS_MAKER_USERNAME",
+                "POS_MAKER_PASSWORD"
+        );
+        requireCredentialPair(
+                securityProperties.getReviewerUsername(),
+                securityProperties.getReviewerPassword(),
+                "POS_REVIEWER_USERNAME",
+                "POS_REVIEWER_PASSWORD"
+        );
+        if (securityProperties.getMakerUsername().equals(securityProperties.getReviewerUsername())) {
+            throw new IllegalStateException("經辦與覆核帳號不可相同");
+        }
         return new InMemoryUserDetailsManager(
                 User.withUsername(securityProperties.getMakerUsername())
                         .password(passwordEncoder().encode(securityProperties.getMakerPassword()))
@@ -93,9 +124,37 @@ public class SecurityConfig {
     }
 
     @Bean
-    @ConditionalOnProperty(prefix = "pos.security", name = "enabled", havingValue = "false", matchIfMissing = true)
+    @Profile("prod")
+    @ConditionalOnProperty(prefix = "pos.security", name = "enabled", havingValue = "true")
+    public UserDetailsService jdbcUserDetailsService(DataSource dataSource) {
+        JdbcUserDetailsManager manager = new JdbcUserDetailsManager(dataSource);
+        manager.setJdbcTemplate(new JdbcTemplate(dataSource));
+        provisionUser(manager, securityProperties.getMakerUsername(), securityProperties.getMakerPassword(), "ROLE_MAKER");
+        provisionUser(manager, securityProperties.getReviewerUsername(), securityProperties.getReviewerPassword(), "ROLE_REVIEWER");
+        if (securityProperties.getMakerUsername().equals(securityProperties.getReviewerUsername())) {
+            throw new IllegalStateException("經辦與覆核帳號不可相同");
+        }
+        return manager;
+    }
+
+    @Bean
+    @Profile({"local", "test"})
+    @ConditionalOnProperty(prefix = "pos.security", name = "enabled", havingValue = "false")
     public UserDetailsService localUserDetailsService() {
         return new InMemoryUserDetailsManager();
+    }
+
+    private void provisionUser(JdbcUserDetailsManager manager, String username, String password, String role) {
+        requireCredentialPair(username, password, role, role);
+        UserDetails user = User.withUsername(username)
+                .password(passwordEncoder().encode(password))
+                .roles(role.substring("ROLE_".length()))
+                .build();
+        if (manager.userExists(username)) {
+            manager.updateUser(user);
+        } else {
+            manager.createUser(user);
+        }
     }
 
     @Bean
@@ -107,8 +166,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(corsProperties.getAllowedOrigins());
-        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
         configuration.setAllowCredentials(false);
         configuration.setMaxAge(3600L);
 
@@ -117,9 +176,18 @@ public class SecurityConfig {
         return source;
     }
 
-    private void requireCredential(String value, String environmentName) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalStateException("啟用 POS Security 時必須設定 " + environmentName);
+    private void requireCredentialPair(String username, String password, String usernameEnvironment, String passwordEnvironment) {
+        if (username == null || username.isBlank()) {
+            throw new IllegalStateException("啟用 POS Security 時必須設定 " + usernameEnvironment);
+        }
+        if (password == null || password.isBlank()) {
+            throw new IllegalStateException("啟用 POS Security 時必須設定 " + passwordEnvironment);
+        }
+        if (password.length() < 12) {
+            throw new IllegalStateException(passwordEnvironment + " 至少需要 12 個字元");
+        }
+        if (username.equals(password)) {
+            throw new IllegalStateException(passwordEnvironment + " 不可與帳號相同");
         }
     }
 

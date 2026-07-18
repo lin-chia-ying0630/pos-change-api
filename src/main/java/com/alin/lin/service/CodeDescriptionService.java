@@ -3,6 +3,7 @@ package com.alin.lin.service;
 import com.alin.lin.entity.CodeDescription;
 
 import java.util.List;
+import java.util.Map;
 
 public interface CodeDescriptionService {
     List<CodeDescription> findAddressTypes();
@@ -12,6 +13,8 @@ public interface CodeDescriptionService {
     List<CodeDescription> findChangeItems();
 
     CodeDescription findPostalCodeZipCode3(String zipCode3);
+
+    Map<String, String> findChtFieldNames();
 
     String communicationAddressCode();
 

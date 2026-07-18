@@ -32,7 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(SecurityConfig.class)
 @EnableConfigurationProperties({PosSecurityProperties.class, PosCorsProperties.class})
 @TestPropertySource(properties = {
+        "spring.profiles.active=test",
         "pos.security.enabled=true",
+        "pos.security.require-https=false",
         "pos.security.maker-username=maker",
         "pos.security.maker-password=maker-secret",
         "pos.security.reviewer-username=reviewer",
@@ -64,7 +66,7 @@ class SecurityAuthorizationTest {
                 .policySeq(1)
                 .changeCaseNo("C1150712001")
                 .acceptanceStatus("P")
-                .changeItem("001")
+                .changeItems(java.util.List.of("001", "002"))
                 .build());
 
         mockMvc.perform(post("/api/change-cases")
@@ -74,7 +76,7 @@ class SecurityAuthorizationTest {
                                 {
                                   "policyNo": "P000000001",
                                   "policySeq": 1,
-                                  "changeItem": "001"
+                                  "changeItems": ["001", "002"]
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -91,6 +93,40 @@ class SecurityAuthorizationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.errorMessage").value("沒有執行此作業的權限"));
+    }
+
+    @Test
+    void rejectsFabricatedChangeCaseNumber() throws Exception {
+        mockMvc.perform(post("/api/change-cases/CUSTOM/address-change")
+                        .with(httpBasic("maker", "maker-secret"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "policyNo": "P000000001",
+                                  "policySeq": 1,
+                                  "addressType": "01"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorMessage").value("changeCaseNo 格式錯誤"));
+    }
+
+    @Test
+    void rejectsNegativeInsuredAmount() throws Exception {
+        mockMvc.perform(post("/api/change-cases/C1150718001/main-amount-change")
+                        .with(httpBasic("maker", "maker-secret"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "policyNo": "P000000001",
+                                  "policySeq": 1,
+                                  "insuredAmount": -1
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorMessage").value("insuredAmount 不可小於 0"));
     }
 
     @Test

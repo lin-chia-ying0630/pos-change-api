@@ -2,6 +2,9 @@ package com.alin.lin.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,9 +19,12 @@ import java.math.BigDecimal;
 public class RideAmountChangeRequest {
     // 主附約序號
     @NotBlank(message = "rideOrder 不可空白")
+    @Pattern(regexp = com.alin.lin.util.ValidationPatterns.RIDE_ORDER, message = "rideOrder 必須為 3 碼數字")
     private String rideOrder;
 
     // 變更後保額
     @NotNull(message = "insuredAmount 不可空白")
+    @DecimalMin(value = "0.00", message = "insuredAmount 不可小於 0")
+    @Digits(integer = 8, fraction = 2, message = "insuredAmount 最多 8 位整數及 2 位小數")
     private BigDecimal insuredAmount;
 }

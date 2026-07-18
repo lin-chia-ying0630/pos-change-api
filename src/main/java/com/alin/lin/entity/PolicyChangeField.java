@@ -30,6 +30,9 @@ public class PolicyChangeField {
     // 異動欄位
     private String changeField;
 
+    // 畫面顯示的中文欄位名稱，由 CodeDescription 補入，不對應資料表欄位。
+    private String chineseName;
+
     // 異動目標鍵值
     private String changeKey;
 

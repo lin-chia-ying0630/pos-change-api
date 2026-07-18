@@ -1,5 +1,6 @@
 package com.alin.lin.service.impl;
 
+import com.alin.lin.config.PosChangeProperties;
 import com.alin.lin.dao.PolicyChangeDao;
 import com.alin.lin.dto.PolicyChangeCaseDto;
 import com.alin.lin.dto.UpdateChangeCaseStatusDto;
@@ -9,11 +10,16 @@ import com.alin.lin.exception.ChangeCaseConflictException;
 import com.alin.lin.service.ChangeCaseApplyService;
 import com.alin.lin.service.ChangeCaseReviewService;
 import com.alin.lin.service.CodeDescriptionService;
+import com.alin.lin.service.CurrentUserService;
 import com.alin.lin.service.PolicyChangeSupportService;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.NoSuchElementException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Objects;
 
 import static com.alin.lin.util.PolicyChangeFieldUtil.requireNotNull;
 import static com.alin.lin.util.PolicyChangeFieldUtil.requireText;
@@ -24,17 +30,23 @@ public class ChangeCaseReviewServiceImpl implements ChangeCaseReviewService {
     private final PolicyChangeSupportService policyChangeSupportService;
     private final CodeDescriptionService codeDescriptionService;
     private final ChangeCaseApplyService changeCaseApplyService;
+    private final CurrentUserService currentUserService;
+    private final ZoneId changeCaseZoneId;
 
     public ChangeCaseReviewServiceImpl(
             PolicyChangeDao policyChangeDao,
             PolicyChangeSupportService policyChangeSupportService,
             CodeDescriptionService codeDescriptionService,
-            ChangeCaseApplyService changeCaseApplyService
+            ChangeCaseApplyService changeCaseApplyService,
+            CurrentUserService currentUserService,
+            PosChangeProperties posChangeProperties
     ) {
         this.policyChangeDao = policyChangeDao;
         this.policyChangeSupportService = policyChangeSupportService;
         this.codeDescriptionService = codeDescriptionService;
         this.changeCaseApplyService = changeCaseApplyService;
+        this.currentUserService = currentUserService;
+        this.changeCaseZoneId = ZoneId.of(posChangeProperties.getZoneId());
     }
 
     @Override
@@ -44,6 +56,9 @@ public class ChangeCaseReviewServiceImpl implements ChangeCaseReviewService {
         requireText(request.getPolicyNo(), "policyNo");
         requireNotNull(request.getPolicySeq(), "policySeq");
         policyChangeSupportService.requirePolicy(request.getPolicyNo(), request.getPolicySeq());
+        if (currentUserService.securityEnabled() && !currentUserService.hasRole("REVIEWER")) {
+            throw new AccessDeniedException("只有覆核人員可以變更案件狀態");
+        }
 
         String targetStatus = normalizeStatus(request.getAcceptanceStatus());
         String pendingStatus = codeDescriptionService.pendingStatusCode();
@@ -57,6 +72,10 @@ public class ChangeCaseReviewServiceImpl implements ChangeCaseReviewService {
         );
         if (changeCase == null) {
             throw new NoSuchElementException("找不到保全受理資料: " + changeCaseNo);
+        }
+        if (currentUserService.securityEnabled()
+                && Objects.equals(currentUserService.username(), changeCase.getCreatedBy())) {
+            throw new AccessDeniedException("建檔經辦不可覆核自己的案件");
         }
         if (!pendingStatus.equals(normalizeStatus(changeCase.getAcceptanceStatus()))) {
             throw new ChangeCaseConflictException("案件已由其他人處理，只有 P-受理中可以覆核");
@@ -95,12 +114,19 @@ public class ChangeCaseReviewServiceImpl implements ChangeCaseReviewService {
                         .policySeq(request.getPolicySeq())
                         .changeCaseNo(changeCaseNo)
                         .acceptanceStatus(targetStatus)
+                        .reviewedBy(isFinalStatus(targetStatus) ? currentUserService.username() : null)
+                        .reviewedAt(isFinalStatus(targetStatus) ? LocalDateTime.now(changeCaseZoneId) : null)
                         .build(),
                 expectedStatus
         );
         if (updated != 1) {
             throw new ChangeCaseConflictException("案件狀態已變更，請重新查詢後再覆核");
         }
+    }
+
+    private boolean isFinalStatus(String status) {
+        return codeDescriptionService.completeStatusCode().equals(status)
+                || codeDescriptionService.cancelStatusCode().equals(status);
     }
 
     private String normalizeStatus(String acceptanceStatus) {

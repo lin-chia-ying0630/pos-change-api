@@ -8,8 +8,11 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "pos.security")
 public class PosSecurityProperties {
-    // 正式環境開啟角色驗證；本機可關閉以方便開發。
+    // 預設開啟角色驗證；只有 local profile 可明確關閉。
     private boolean enabled;
+
+    // 正式環境要求請求經 HTTPS 或可信任反向代理傳入。
+    private boolean requireHttps;
 
     // 經辦人員帳號與密碼。
     private String makerUsername;

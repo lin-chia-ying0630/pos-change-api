@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Builder
 @Data
@@ -38,6 +39,9 @@ public class PolicyChangeFile {
 
     // 異動後檔案快照
     private String contentAfter;
+
+    // 供畫面逐格顯示的 JSON 欄位中文名稱與異動前後值。
+    private List<PolicyChangeSnapshotField> snapshotFields;
 
     // 建立時間
     private LocalDateTime createdAt;

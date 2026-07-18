@@ -4,6 +4,8 @@ import com.alin.lin.dto.AddressChangeDto;
 import com.alin.lin.dto.AddressChangeRequest;
 import com.alin.lin.dto.CreateChangeCaseDto;
 import com.alin.lin.dto.CreateChangeCaseRequest;
+import com.alin.lin.dto.MainAmountChangeDto;
+import com.alin.lin.dto.MainAmountChangeRequest;
 import com.alin.lin.dto.PolicyChangeCaseDetailDto;
 import com.alin.lin.dto.UpdateChangeCaseStatusRequest;
 import com.alin.lin.exception.ChangeCaseConflictException;
@@ -14,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -33,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
+@ActiveProfiles("local")
 @Testcontainers(disabledWithoutDocker = true)
 class PolicyChangeWorkflowIntegrationTest {
     @Container
@@ -62,6 +66,8 @@ class PolicyChangeWorkflowIntegrationTest {
         jdbcTemplate.update("DELETE FROM policy_change_file");
         jdbcTemplate.update("DELETE FROM policy_change_item");
         jdbcTemplate.update("DELETE FROM policy_change_acceptance");
+        jdbcTemplate.update("DELETE FROM policy_change_case_reservation_item");
+        jdbcTemplate.update("DELETE FROM policy_change_case_reservation");
         jdbcTemplate.update("DELETE FROM policy_change_case_sequence");
         jdbcTemplate.update("""
                 UPDATE main_policy_address
@@ -118,6 +124,54 @@ class PolicyChangeWorkflowIntegrationTest {
                 .count());
         assertTrue(detail.getChangeFields().stream()
                 .anyMatch(field -> "臺北市中正區重慶南路一段３號".equals(field.getContentAfter())));
+    }
+
+    @Test
+    void oneCaseNumberStoresAddressAndMainAmountChanges() {
+        CreateChangeCaseDto changeCase = policyChangeService.createChangeCase(CreateChangeCaseRequest.builder()
+                .policyNo("P000000001")
+                .policySeq(1)
+                .changeItems(List.of("001", "002"))
+                .build());
+
+        saveCommunicationAddress(changeCase.getChangeCaseNo(), "臺北市中正區重慶南路一段２號");
+        MainAmountChangeDto mainAmountResult = policyChangeService.saveMainAmountChange(
+                changeCase.getChangeCaseNo(), MainAmountChangeRequest.builder()
+                .policyNo("P000000001")
+                .policySeq(1)
+                .insuredAmount(new java.math.BigDecimal("1100000"))
+                .build()
+        );
+        assertEquals(1, mainAmountResult.getChangedFieldCount());
+
+        PolicyChangeCaseDetailDto detail = policyChangeService.findChangeCaseDetail(
+                "P000000001", 1, changeCase.getChangeCaseNo()
+        );
+        assertEquals(Set.of("001", "002"), detail.getChangeFields().stream()
+                .map(field -> field.getChangeItem())
+                .collect(java.util.stream.Collectors.toSet()));
+        assertEquals(1, detail.getChangeFields().stream()
+                .filter(field -> "002".equals(field.getChangeItem()))
+                .count());
+        assertEquals(Set.of("main_policy_ride.000.insured_amount"),
+                detail.getChangeFields().stream()
+                        .filter(field -> "002".equals(field.getChangeItem()))
+                        .map(field -> field.getChangeField())
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertEquals(1, detail.getChangeFiles().stream()
+                .filter(file -> "002".equals(file.getChangeItem()))
+                .count());
+        assertTrue(detail.getChangeFiles().stream()
+                .filter(file -> "002".equals(file.getChangeItem()))
+                .flatMap(file -> file.getSnapshotFields().stream())
+                .anyMatch(field -> "insuredAmount".equals(field.getJsonKey())
+                        && "1000000".equals(field.getContentBefore())
+                        && "1100000".equals(field.getContentAfter())));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM policy_change_acceptance WHERE change_case_no = ?",
+                Integer.class,
+                changeCase.getChangeCaseNo()
+        ));
     }
 
     @Test
@@ -180,7 +234,7 @@ class PolicyChangeWorkflowIntegrationTest {
         return policyChangeService.createChangeCase(CreateChangeCaseRequest.builder()
                 .policyNo("P000000001")
                 .policySeq(1)
-                .changeItem("001")
+                .changeItems(java.util.List.of("001"))
                 .build());
     }
 

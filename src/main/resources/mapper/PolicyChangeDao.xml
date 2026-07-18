@@ -72,6 +72,17 @@
         ORDER BY code_before
     </select>
 
+    <select id="findCodesByGroup" resultType="com.alin.lin.entity.CodeDescription">
+        SELECT code_group,
+               code_field,
+               code_before,
+               code_after,
+               code_description
+        FROM code_description
+        WHERE code_group = #{codeGroup}
+        ORDER BY code_field
+    </select>
+
     <select id="findCode" resultType="com.alin.lin.entity.CodeDescription">
         SELECT code_group,
                code_field,
@@ -91,15 +102,60 @@
             current_serial = LAST_INSERT_ID(current_serial + 1)
     </insert>
 
+    <insert id="insertCaseReservationItem">
+        INSERT INTO policy_change_case_reservation_item (change_case_no, change_item)
+        VALUES (#{changeCaseNo}, #{changeItem})
+    </insert>
+
     <select id="findLastInsertedSequence" resultType="long">
         SELECT LAST_INSERT_ID()
     </select>
 
-    <select id="existsChangeCaseNo" resultType="int">
-        SELECT COUNT(*)
-        FROM policy_change_acceptance
+    <select id="findReservedChangeItems" resultType="string">
+        SELECT change_item
+        FROM policy_change_case_reservation_item
         WHERE change_case_no = #{changeCaseNo}
+        ORDER BY change_item
     </select>
+
+    <insert id="insertCaseReservation">
+        INSERT INTO policy_change_case_reservation (
+            change_case_no,
+            policy_no,
+            policy_seq,
+            reserved_by,
+            expires_at
+        )
+        VALUES (
+            #{changeCaseNo},
+            #{policyNo},
+            #{policySeq},
+            #{reservedBy},
+            #{expiresAt}
+        )
+    </insert>
+
+    <select id="findCaseReservationForUpdate" resultType="com.alin.lin.entity.PolicyChangeCaseReservation">
+        SELECT change_case_no,
+               policy_no,
+               policy_seq,
+               reserved_by,
+               expires_at,
+               consumed_at,
+               created_at
+        FROM policy_change_case_reservation
+        WHERE change_case_no = #{changeCaseNo}
+        FOR UPDATE
+    </select>
+
+    <update id="consumeCaseReservation">
+        UPDATE policy_change_case_reservation
+        SET consumed_at = CURRENT_TIMESTAMP
+        WHERE change_case_no = #{changeCaseNo}
+          AND reserved_by = #{reservedBy}
+          AND consumed_at IS NULL
+          AND expires_at &gt; CURRENT_TIMESTAMP
+    </update>
 
     <select id="findChangeCases" resultType="com.alin.lin.dto.PolicyChangeCaseDto">
         SELECT a.policy_no,
@@ -107,8 +163,11 @@
                a.change_case_no,
                a.acceptance_status,
                COALESCE(status_cd.code_description, a.acceptance_status) AS acceptance_status_description,
-               GROUP_CONCAT(i.change_item ORDER BY i.change_item SEPARATOR ',') AS change_items,
-               GROUP_CONCAT(COALESCE(cd.code_description, i.change_item) ORDER BY i.change_item SEPARATOR ',') AS change_item_descriptions
+               a.created_by,
+               a.reviewed_by,
+               a.reviewed_at,
+               GROUP_CONCAT(DISTINCT i.change_item ORDER BY i.change_item SEPARATOR ',') AS change_items,
+               GROUP_CONCAT(DISTINCT COALESCE(cd.code_description, i.change_item) ORDER BY i.change_item SEPARATOR ',') AS change_item_descriptions
         FROM policy_change_acceptance a
         LEFT JOIN code_description status_cd
           ON status_cd.code_group = 'policy-change-acceptance'
@@ -123,7 +182,8 @@
          AND cd.code_field = 'change_item'
          AND cd.code_before = i.change_item
         WHERE a.policy_no = #{policyNo}
-        GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status, status_cd.code_description, a.created_at
+        GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status,
+                 status_cd.code_description, a.created_by, a.reviewed_by, a.reviewed_at, a.created_at
         ORDER BY a.created_at DESC
     </select>
 
@@ -133,8 +193,11 @@
                a.change_case_no,
                a.acceptance_status,
                COALESCE(status_cd.code_description, a.acceptance_status) AS acceptance_status_description,
-               GROUP_CONCAT(i.change_item ORDER BY i.change_item SEPARATOR ',') AS change_items,
-               GROUP_CONCAT(COALESCE(cd.code_description, i.change_item) ORDER BY i.change_item SEPARATOR ',') AS change_item_descriptions
+               a.created_by,
+               a.reviewed_by,
+               a.reviewed_at,
+               GROUP_CONCAT(DISTINCT i.change_item ORDER BY i.change_item SEPARATOR ',') AS change_items,
+               GROUP_CONCAT(DISTINCT COALESCE(cd.code_description, i.change_item) ORDER BY i.change_item SEPARATOR ',') AS change_item_descriptions
         FROM policy_change_acceptance a
         LEFT JOIN code_description status_cd
           ON status_cd.code_group = 'policy-change-acceptance'
@@ -151,7 +214,57 @@
         WHERE a.policy_no = #{policyNo}
           AND a.policy_seq = #{policySeq}
           AND a.change_case_no = #{changeCaseNo}
-        GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status, status_cd.code_description
+        GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status,
+                 status_cd.code_description, a.created_by, a.reviewed_by, a.reviewed_at
+    </select>
+
+    <!-- 申請資格檢核：同保單、序號及保全變更項目的最近一筆受理案件。 -->
+    <select id="findLatestChangeCaseByItem" resultType="com.alin.lin.dto.PolicyChangeCaseDto">
+        SELECT a.policy_no,
+               a.policy_seq,
+               a.change_case_no,
+               a.acceptance_status,
+               COALESCE(status_cd.code_description, a.acceptance_status) AS acceptance_status_description,
+               a.created_by,
+               a.reviewed_by,
+               a.reviewed_at,
+               i.change_item AS change_items,
+               COALESCE(item_cd.code_description, i.change_item) AS change_item_descriptions
+        FROM policy_change_acceptance a
+        JOIN policy_change_item i
+          ON i.policy_no = a.policy_no
+         AND i.policy_seq = a.policy_seq
+         AND i.change_case_no = a.change_case_no
+        LEFT JOIN code_description status_cd
+          ON status_cd.code_group = 'policy-change-acceptance'
+         AND status_cd.code_field = 'acceptance_status'
+         AND status_cd.code_before = a.acceptance_status
+        LEFT JOIN code_description item_cd
+          ON item_cd.code_group = 'policy-change-item'
+         AND item_cd.code_field = 'change_item'
+         AND item_cd.code_before = i.change_item
+        WHERE a.policy_no = #{policyNo}
+          AND a.policy_seq = #{policySeq}
+          AND i.change_item = #{changeItem}
+        ORDER BY a.created_at DESC, a.change_case_no DESC
+        LIMIT 1
+    </select>
+
+    <select id="findAcceptanceForUpdate" resultType="com.alin.lin.entity.PolicyChangeAcceptance">
+        SELECT policy_no,
+               policy_seq,
+               change_case_no,
+               acceptance_status,
+               created_by,
+               reviewed_by,
+               reviewed_at,
+               created_at,
+               updated_at
+        FROM policy_change_acceptance
+        WHERE policy_no = #{policyNo}
+          AND policy_seq = #{policySeq}
+          AND change_case_no = #{changeCaseNo}
+        FOR UPDATE
     </select>
 
     <select id="findChangeItemsByCaseNo" resultType="string">
@@ -242,8 +355,14 @@
     </select>
 
     <insert id="insertAcceptance">
-        INSERT INTO policy_change_acceptance (policy_no, policy_seq, change_case_no, acceptance_status)
-        VALUES (#{policyNo}, #{policySeq}, #{changeCaseNo}, #{acceptanceStatus})
+        INSERT INTO policy_change_acceptance (
+            policy_no,
+            policy_seq,
+            change_case_no,
+            acceptance_status,
+            created_by
+        )
+        VALUES (#{policyNo}, #{policySeq}, #{changeCaseNo}, #{acceptanceStatus}, #{createdBy})
     </insert>
 
     <insert id="insertChangeItem">
@@ -385,7 +504,9 @@
 
     <update id="updateAcceptanceStatusIfCurrent">
         UPDATE policy_change_acceptance
-        SET acceptance_status = #{acceptance.acceptanceStatus}
+        SET acceptance_status = #{acceptance.acceptanceStatus},
+            reviewed_by = COALESCE(#{acceptance.reviewedBy}, reviewed_by),
+            reviewed_at = COALESCE(#{acceptance.reviewedAt}, reviewed_at)
         WHERE policy_no = #{acceptance.policyNo}
           AND policy_seq = #{acceptance.policySeq}
           AND change_case_no = #{acceptance.changeCaseNo}
@@ -401,20 +522,6 @@
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
           AND address_type = #{addressType}
-    </update>
-
-    <update id="updateMasterField">
-        UPDATE main_policy_master
-        <set>
-            <choose>
-                <when test="changeField == 'main_product_code'">main_product_code = #{contentAfter},</when>
-                <when test="changeField == 'main_policy_years'">main_policy_years = CAST(#{contentAfter} AS SIGNED),</when>
-                <when test="changeField == 'insured_amount'">insured_amount = CAST(#{contentAfter} AS DECIMAL(10, 2)),</when>
-                <when test="changeField == 'premium'">premium = CAST(#{contentAfter} AS DECIMAL(17, 4)),</when>
-            </choose>
-        </set>
-        WHERE policy_no = #{policyNo}
-          AND policy_seq = #{policySeq}
     </update>
 
     <update id="updateRideAmount">

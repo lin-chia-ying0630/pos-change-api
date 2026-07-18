@@ -4,6 +4,7 @@ import com.alin.lin.dto.AddressChangeDto;
 import com.alin.lin.dto.AddressChangeRequest;
 import com.alin.lin.dto.CreateChangeCaseDto;
 import com.alin.lin.dto.CreateChangeCaseRequest;
+import com.alin.lin.dto.ChangeCaseEligibilityDto;
 import com.alin.lin.dto.MainAmountChangeDto;
 import com.alin.lin.dto.MainAmountChangeRequest;
 import com.alin.lin.dto.PolicyChangeCaseDto;
@@ -20,6 +21,8 @@ public interface PolicyChangeService {
     PolicyDetailDto findPolicyDetail(String policyNo, Integer policySeq);
 
     PostalCodeAreaDto findPostalCodeArea(String postalCode);
+
+    ChangeCaseEligibilityDto checkChangeCaseEligibility(String policyNo, Integer policySeq, String changeItem);
 
     CreateChangeCaseDto createChangeCase(CreateChangeCaseRequest request);
 

@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Builder
 @Data
 @NoArgsConstructor
@@ -24,6 +26,15 @@ public class PolicyChangeCaseDto {
 
     // 受理狀態說明
     private String acceptanceStatusDescription;
+
+    // 建檔經辦帳號
+    private String createdBy;
+
+    // 覆核帳號
+    private String reviewedBy;
+
+    // 覆核時間
+    private LocalDateTime reviewedAt;
 
     // 保全變更項目清單
     private String changeItems;

@@ -8,6 +8,8 @@ import com.alin.lin.service.CodeDescriptionService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 @Service
@@ -40,6 +42,15 @@ public class CodeDescriptionServiceImpl implements CodeDescriptionService {
                 CodeTable.POSTAL_CODE_ZIP_CODE3.getCodeField(),
                 zipCode3
         );
+    }
+
+    @Override
+    public Map<String, String> findChtFieldNames() {
+        Map<String, String> fieldNames = new LinkedHashMap<>();
+        for (CodeDescription code : policyChangeDao.findCodesByGroup("CHT-code")) {
+            fieldNames.putIfAbsent(code.getCodeField(), code.getCodeBefore());
+        }
+        return fieldNames;
     }
 
     @Override

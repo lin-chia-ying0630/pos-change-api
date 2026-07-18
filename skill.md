@@ -58,6 +58,9 @@
 - 必須由 `policy_change_case_sequence` 使用單一原子 `INSERT ... ON DUPLICATE KEY UPDATE` 與 connection-local `LAST_INSERT_ID()` 取號。
 - 禁止使用 JVM 記憶體、自增欄位快取或只查 `MAX(change_case_no)`。
 - 取號不建立受理檔，只有真的異動才建立 `P` 草稿。
+- 取號前必須依 `policy_no + policy_seq + change_item` 查最近一筆已受理案件；最近狀態為 `P` 時回覆 HTTP 409 與「此保單正在受理中，無法申請」。eligibility API 與建案 Service 必須執行相同規則。
+- 取號必須新增一筆 `policy_change_case_reservation`，並以 `policy_change_case_reservation_item` 保存一至多個勾選項目；儲存前驗證保單、擁有者、期限與項目是否在預約清單。
+- 同一案號只能有一筆 `policy_change_acceptance`，但可以依序新增多筆 `policy_change_item`；第二項儲存不得再次建立受理檔或拒絕既有案號。
 - 流水號不可限制在 `999`；`String.format("%03d", serial)` 只定義最小寬度。
 
 ## 草稿
@@ -79,6 +82,7 @@
 - 主檔已被其他案件修改時拋出 `ChangeCaseConflictException` 並回覆 HTTP 409。
 - 覆核清單之外必須提供案件明細 API，包含 `changeFields` 與 `changeFiles`。
 - 完成、主檔套用、總保費重算與狀態更新必須在同一交易內。
+- 受理檔必須保存 `created_by`、`reviewed_by`、`reviewed_at`；啟用 Security 時禁止建檔人覆核自己的案件。
 
 ## 變更項目
 
@@ -92,9 +96,12 @@
 
 ### 002 主約保額
 
-- 同時記錄主檔保額，`change_key = MASTER`。
-- 同時記錄主約列 `ride_order = 000`，`change_key = 000`。
-- 覆核時兩筆需一起成功或一起 rollback。
+- 案件清單聚合變更項目時必須去重。
+- `main_policy_master` 不保存主約險種、年期與保額。
+- 002 只記錄並更新 `main_policy_ride` 的主約列，`ride_order = 000`、`change_key = 000`。
+- 002 同時保存 `main_policy_ride` 完整資料列快照；欄位紀錄負責套用，檔案快照負責查詢呈現。
+- 查詢明細需將 snake_case 或複合欄位名稱轉為對應 JSON key，再由 `CHT-code` 補入 `changeFields.chineseName`。
+- `changedFieldCount` 回傳業務異動數 `1`。
 
 ### 003 附約保額
 
@@ -107,16 +114,22 @@
 
 - 地址型態、變更項目、受理狀態與主附約型態由 `code_description` 管理。
 - Java 判斷使用穩定 code key，不使用中文描述。
+- 覆核快照欄位名稱使用 `codeGroup=CHT-code`、`codeField=JSON key`、`codeBefore=中文名稱`；案件明細 API 將 JSON 拆成 `snapshotFields`，逐欄回傳中文名稱與異動前後值。
 - `CodeTable` 定義 group/field；`CodeDescriptionMeaning` 定義程式需要的穩定 key。
 - 欄位名稱、regex、組合與解析規則才放 enum。
 
 ## Security 與設定
 
 - CORS origin 從 `pos.cors.allowed-origins`／`CORS_ALLOWED_ORIGINS` 取得，不可硬寫在 Controller。
-- `local` 由 `POS_SECURITY_ENABLED` 決定且預設關閉；`prod` 必須開啟 `pos.security.enabled=true`。
+- Security 採 fail-closed，所有 profile 預設開啟；只有 `local`／`test` 可明確關閉，其他 profile 關閉時必須拒絕啟動。
+- `prod` 必須設定 `pos.security.require-https=true`，並由可信任反向代理傳入 HTTPS forwarding header。
 - MAKER 可新增與儲存；REVIEWER 才能覆核。
+- MAKER 只能修改與查看自己建立的案件，REVIEWER 可查看覆核清單；Service 層也必須重做案件擁有者檢查。
+- 經辦與覆核帳號不可相同，密碼至少 12 個字元。
 - DB 與帳號密碼只能由環境變數、Docker secret 或 K8s Secret 提供，程式不得有正式預設密碼。
 - K8s 使用 Actuator liveness/readiness endpoint。
+- Docker runtime 必須非 root；應使用唯讀 root filesystem、`no-new-privileges` 與最小 Linux capabilities。
+- Docker 建置與執行映像必須固定 digest；升級時同步掃描弱點並更新 digest。
 
 ## Flyway
 
@@ -128,11 +141,13 @@
 ## 測試
 
 - 一般單元測試不得依賴開發者本機 MySQL。
+- IntelliJ 本機 Debug 使用 `.run/POS Change API Local.run.xml`，必須啟用 `local` profile，避免 `db/local` migration 在同一資料庫被 Flyway 判定為 missing。
 - Controller/Security slice 至少驗證未登入、角色越權、MAKER/REVIEWER 正常流程與 CORS properties。
 - SQL、Flyway、交易與併發流程使用 MySQL Testcontainers。
 - 至少覆蓋：原子案號、無異動、重複儲存、改回原值、P/S/C、409 衝突、001/002/003。
 - Docker 不可用時整合測試可略過；CI 必須在 Docker 可用環境完整執行。
 - 修改 SQL 遮罩規則時同步補 `MaskedSqlLogInterceptorTest`。
+- CI 必須執行 CodeQL、OSV、Docker build；Maven、Docker 與 GitHub Actions 由 Dependabot 定期更新。
 
 ## 驗證指令
 
@@ -143,3 +158,9 @@ docker build -t pos-change-api:latest .
 ```
 
 - Docker Maven 層使用 BuildKit cache；不要以 `dependency:go-offline` 預抓未使用的 dependency management BOM。
+# Deployment rules
+
+- Production uses JDBC-backed `users` and `authorities`; local/test may use in-memory users.
+- Never commit passwords, password hashes, `.env` files, or database backups.
+- Back up MySQL before every Flyway migration and rehearse V6/V7 against a sanitized copy.
+- Keep database constraints and transactional status transitions as the source of truth for concurrent cases.

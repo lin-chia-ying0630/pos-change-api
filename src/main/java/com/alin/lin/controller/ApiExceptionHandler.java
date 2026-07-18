@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -64,6 +65,11 @@ public class ApiExceptionHandler {
         return ResponseUtil.conflict(exception.getMessage());
     }
 
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ResponseBodyDto<Void>> handleAccessDenied(AccessDeniedException exception) {
+        return ResponseUtil.forbidden(exception.getMessage());
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ResponseBodyDto<Void>> handleNoResource(NoResourceFoundException exception) {
         return ResponseUtil.notFound("找不到 API 路徑");
@@ -77,25 +83,25 @@ public class ApiExceptionHandler {
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ResponseBodyDto<Void>> handleIllegalState(IllegalStateException exception) {
         log.error("Unexpected application error", exception);
-        return ResponseUtil.serverError(exception.getMessage());
+        return ResponseUtil.serverError("系統狀態異常，請稍後再試");
     }
 
     @ExceptionHandler(CannotGetJdbcConnectionException.class)
     public ResponseEntity<ResponseBodyDto<Void>> handleDatabaseConnection(CannotGetJdbcConnectionException exception) {
         log.error("Database connection failed", exception);
-        return ResponseUtil.serviceUnavailable("資料庫連線失敗，請確認 DB_URL、DB_USERNAME、DB_PASSWORD 與 main 資料庫是否已建立");
+        return ResponseUtil.serviceUnavailable("資料庫服務暫時無法使用");
     }
 
     @ExceptionHandler(CannotCreateTransactionException.class)
     public ResponseEntity<ResponseBodyDto<Void>> handleTransactionConnection(CannotCreateTransactionException exception) {
         log.error("Database transaction failed", exception);
-        return ResponseUtil.serviceUnavailable("資料庫連線失敗，請確認 DB_URL、DB_USERNAME、DB_PASSWORD 與 main 資料庫是否已建立");
+        return ResponseUtil.serviceUnavailable("資料庫服務暫時無法使用");
     }
 
     @ExceptionHandler(MyBatisSystemException.class)
     public ResponseEntity<ResponseBodyDto<Void>> handleMyBatis(MyBatisSystemException exception) {
         log.error("Database operation failed", exception);
-        return ResponseUtil.serviceUnavailable("資料庫作業失敗，請確認 MySQL 連線、schema.sql 是否已匯入，以及資料表是否存在");
+        return ResponseUtil.serviceUnavailable("資料庫服務暫時無法使用");
     }
 
     @ExceptionHandler(Exception.class)

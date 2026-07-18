@@ -2,6 +2,8 @@ package com.alin.lin.util;
 
 import com.alin.lin.entity.MainPolicyAddress;
 import com.alin.lin.enums.PolicyChangeFieldName;
+import com.alin.lin.enums.PolicyRideKey;
+import com.alin.lin.enums.RideChangeField;
 import com.alin.lin.util.PolicyChangeFieldUtil.FieldChange;
 import org.junit.jupiter.api.Test;
 
@@ -59,8 +61,8 @@ class PolicyChangeFieldUtilTest {
 
         PolicyChangeFieldUtil.addAmountChangeIfDifferent(
                 changes,
-                PolicyChangeFieldName.MASTER_INSURED_AMOUNT.getFieldName(),
-                PolicyChangeFieldName.MASTER_CHANGE_KEY.getFieldName(),
+                RideChangeField.INSURED_AMOUNT.fieldName(PolicyRideKey.MAIN.getRideOrder()),
+                PolicyRideKey.MAIN.getRideOrder(),
                 new BigDecimal("1000000.00"),
                 new BigDecimal("1000000")
         );

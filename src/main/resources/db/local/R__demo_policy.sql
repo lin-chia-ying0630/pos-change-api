@@ -1,9 +1,6 @@
-INSERT INTO main_policy_master (policy_no, policy_seq, main_product_code, main_policy_years, insured_amount, premium)
-VALUES ('P000000001', 1, 'LIFE', 20, 1000000.00, 15925.9089) AS incoming
+INSERT INTO main_policy_master (policy_no, policy_seq, premium)
+VALUES ('P000000001', 1, 15925.9089) AS incoming
 ON DUPLICATE KEY UPDATE
-    main_product_code = incoming.main_product_code,
-    main_policy_years = incoming.main_policy_years,
-    insured_amount = incoming.insured_amount,
     premium = incoming.premium;
 
 INSERT INTO main_policy_address (policy_no, policy_seq, address_type, zip_code3, zip_code2, full_width_address, half_width_address)

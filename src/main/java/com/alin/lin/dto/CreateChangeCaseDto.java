@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Builder
 @Data
 @NoArgsConstructor
@@ -22,6 +24,6 @@ public class CreateChangeCaseDto {
     // 受理狀態
     private String acceptanceStatus;
 
-    // 保全變更項目
-    private String changeItem;
+    // 同一案號包含的保全變更項目
+    private List<String> changeItems;
 }

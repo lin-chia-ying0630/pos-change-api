@@ -62,6 +62,10 @@ public class ResponseUtil {
         return builder(HttpStatus.CONFLICT, false, null, "", "", errorMessage);
     }
 
+    public static <T> ResponseEntity<ResponseBodyDto<T>> forbidden(String errorMessage) {
+        return builder(HttpStatus.FORBIDDEN, false, null, "", "", errorMessage);
+    }
+
     public static <T> ResponseEntity<ResponseBodyDto<T>> serverError(String errorMessage) {
         return builder(HttpStatus.INTERNAL_SERVER_ERROR, false, null, "", "", errorMessage);
     }

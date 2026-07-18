@@ -5,15 +5,15 @@ import com.alin.lin.dto.MainAmountChangeDto;
 import com.alin.lin.dto.MainAmountChangeRequest;
 import com.alin.lin.dto.RideAmountChangeRequest;
 import com.alin.lin.dto.RiderAmountChangeListRequest;
-import com.alin.lin.entity.MainPolicyMaster;
 import com.alin.lin.entity.MainPolicyRide;
-import com.alin.lin.enums.PolicyChangeFieldName;
 import com.alin.lin.enums.PolicyRideKey;
 import com.alin.lin.enums.RideChangeField;
 import com.alin.lin.service.AmountChangeSaveService;
 import com.alin.lin.service.CodeDescriptionService;
 import com.alin.lin.service.PolicyChangeSupportService;
 import com.alin.lin.util.PolicyChangeFieldUtil.FieldChange;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,59 +34,78 @@ import static com.alin.lin.util.PolicyChangeFieldUtil.requireText;
 
 @Service
 public class AmountChangeSaveServiceImpl implements AmountChangeSaveService {
+    private static final String RIDE_CHANGE_FILE = "main_policy_ride";
+
     private final PolicyChangeDao policyChangeDao;
     private final PolicyChangeSupportService policyChangeSupportService;
     private final CodeDescriptionService codeDescriptionService;
+    private final ObjectMapper objectMapper;
 
     public AmountChangeSaveServiceImpl(
             PolicyChangeDao policyChangeDao,
             PolicyChangeSupportService policyChangeSupportService,
-            CodeDescriptionService codeDescriptionService
+            CodeDescriptionService codeDescriptionService,
+            ObjectMapper objectMapper
     ) {
         this.policyChangeDao = policyChangeDao;
         this.policyChangeSupportService = policyChangeSupportService;
         this.codeDescriptionService = codeDescriptionService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
     @Transactional
     public MainAmountChangeDto saveMainAmountChange(String changeCaseNo, MainAmountChangeRequest request) {
-        MainPolicyMaster master = policyChangeSupportService.requirePolicy(request.getPolicyNo(), request.getPolicySeq());
+        policyChangeSupportService.requirePolicy(request.getPolicyNo(), request.getPolicySeq());
         requireText(changeCaseNo, "changeCaseNo");
-        requireNotNull(request.getMasterInsuredAmount(), "masterInsuredAmount");
+        requireNotNull(request.getInsuredAmount(), "insuredAmount");
 
         String changeItem = codeDescriptionService.mainAmountChangeItemCode();
+        policyChangeSupportService.validateChangeCaseAccess(
+                request.getPolicyNo(), request.getPolicySeq(), changeCaseNo, changeItem
+        );
         policyChangeDao.deleteChangeFieldsByItem(request.getPolicyNo(), request.getPolicySeq(), changeCaseNo, changeItem);
-        if (amountEquals(master.getInsuredAmount(), request.getMasterInsuredAmount())) {
+        policyChangeDao.deleteChangeFileByItemAndKey(
+                request.getPolicyNo(),
+                request.getPolicySeq(),
+                changeCaseNo,
+                changeItem,
+                RIDE_CHANGE_FILE,
+                PolicyRideKey.MAIN.getRideOrder()
+        );
+        MainPolicyRide mainRide = policyChangeSupportService.requireMainRide(request.getPolicyNo(), request.getPolicySeq());
+        if (amountEquals(mainRide.getInsuredAmount(), request.getInsuredAmount())) {
             policyChangeSupportService.removeEmptyChangeItemAndAcceptance(
                     request.getPolicyNo(), request.getPolicySeq(), changeCaseNo, changeItem
             );
             return result(changeCaseNo, changeItem, 0);
         }
 
-        MainPolicyRide mainRide = policyChangeSupportService.requireMainRide(request.getPolicyNo(), request.getPolicySeq());
-        List<FieldChange> fieldChanges = List.of(
-                new FieldChange(
-                        PolicyChangeFieldName.MASTER_INSURED_AMOUNT.getFieldName(),
-                        PolicyChangeFieldName.MASTER_CHANGE_KEY.getFieldName(),
-                        amountToString(master.getInsuredAmount()),
-                        amountToString(request.getMasterInsuredAmount())
-                ),
-                new FieldChange(
-                        RideChangeField.INSURED_AMOUNT.fieldName(PolicyRideKey.MAIN.getRideOrder()),
-                        PolicyRideKey.MAIN.getRideOrder(),
-                        amountToString(mainRide.getInsuredAmount()),
-                        amountToString(request.getMasterInsuredAmount())
-                )
+        FieldChange fieldChange = new FieldChange(
+                RideChangeField.INSURED_AMOUNT.fieldName(PolicyRideKey.MAIN.getRideOrder()),
+                PolicyRideKey.MAIN.getRideOrder(),
+                amountToString(mainRide.getInsuredAmount()),
+                amountToString(request.getInsuredAmount())
         );
 
         policyChangeSupportService.ensureChangeCaseSaved(
                 request.getPolicyNo(), request.getPolicySeq(), changeCaseNo, changeItem
         );
-        fieldChanges.forEach(fieldChange -> policyChangeSupportService.upsertFieldChange(
+        policyChangeSupportService.upsertFieldChange(
                 request.getPolicyNo(), request.getPolicySeq(), changeCaseNo, changeItem, fieldChange
-        ));
-        return result(changeCaseNo, changeItem, fieldChanges.size());
+        );
+        policyChangeDao.upsertChangeFile(
+                request.getPolicyNo(),
+                request.getPolicySeq(),
+                changeCaseNo,
+                changeItem,
+                RIDE_CHANGE_FILE,
+                PolicyRideKey.MAIN.getRideOrder(),
+                toJson(rideSnapshot(mainRide, mainRide.getInsuredAmount())),
+                toJson(rideSnapshot(mainRide, request.getInsuredAmount()))
+        );
+        // 002 只異動主附約檔的主約列，對使用者回傳一筆業務異動。
+        return result(changeCaseNo, changeItem, 1);
     }
 
     @Override
@@ -130,6 +149,7 @@ public class AmountChangeSaveServiceImpl implements AmountChangeSaveService {
         }
 
         String changeItem = codeDescriptionService.riderAmountChangeItemCode();
+        policyChangeSupportService.validateChangeCaseAccess(policyNo, policySeq, changeCaseNo, changeItem);
         policyChangeDao.deleteChangeFieldsByItem(policyNo, policySeq, changeCaseNo, changeItem);
         if (fieldChanges.isEmpty()) {
             policyChangeSupportService.removeEmptyChangeItemAndAcceptance(policyNo, policySeq, changeCaseNo, changeItem);
@@ -149,5 +169,26 @@ public class AmountChangeSaveServiceImpl implements AmountChangeSaveService {
                 .changeItem(changeItem)
                 .changedFieldCount(changedFieldCount)
                 .build();
+    }
+
+    private Map<String, Object> rideSnapshot(MainPolicyRide ride, java.math.BigDecimal insuredAmount) {
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("policyNo", ride.getPolicyNo());
+        snapshot.put("policySeq", ride.getPolicySeq());
+        snapshot.put("rideType", ride.getRideType());
+        snapshot.put("rideOrder", ride.getRideOrder());
+        snapshot.put("productCode", ride.getProductCode());
+        snapshot.put("policyYears", ride.getPolicyYears());
+        snapshot.put("insuredAmount", insuredAmount);
+        snapshot.put("premium", ride.getPremium());
+        return snapshot;
+    }
+
+    private String toJson(Map<String, Object> snapshot) {
+        try {
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("主約資料轉換失敗", exception);
+        }
     }
 }

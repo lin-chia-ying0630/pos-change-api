@@ -24,6 +24,15 @@ public class PolicyChangeAcceptance {
     // 受理狀態
     private String acceptanceStatus;
 
+    // 建檔經辦帳號
+    private String createdBy;
+
+    // 覆核帳號
+    private String reviewedBy;
+
+    // 覆核時間
+    private LocalDateTime reviewedAt;
+
     // 建立時間
     private LocalDateTime createdAt;
 

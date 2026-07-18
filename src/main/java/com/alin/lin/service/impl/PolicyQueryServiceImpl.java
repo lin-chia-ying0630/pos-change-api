@@ -9,14 +9,24 @@ import com.alin.lin.entity.CodeDescription;
 import com.alin.lin.entity.MainPolicyAddress;
 import com.alin.lin.entity.MainPolicyMaster;
 import com.alin.lin.entity.MainPolicyRide;
+import com.alin.lin.entity.PolicyChangeFile;
+import com.alin.lin.entity.PolicyChangeField;
+import com.alin.lin.entity.PolicyChangeSnapshotField;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.alin.lin.enums.PostalCodeRule;
 import com.alin.lin.service.CodeDescriptionService;
+import com.alin.lin.service.CurrentUserService;
 import com.alin.lin.service.PolicyChangeSupportService;
 import com.alin.lin.service.PolicyQueryService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 
 import static com.alin.lin.util.PolicyChangeFieldUtil.requireText;
 
@@ -25,15 +35,21 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
     private final PolicyChangeDao policyChangeDao;
     private final PolicyChangeSupportService policyChangeSupportService;
     private final CodeDescriptionService codeDescriptionService;
+    private final CurrentUserService currentUserService;
+    private final ObjectMapper objectMapper;
 
     public PolicyQueryServiceImpl(
             PolicyChangeDao policyChangeDao,
             PolicyChangeSupportService policyChangeSupportService,
-            CodeDescriptionService codeDescriptionService
+            CodeDescriptionService codeDescriptionService,
+            CurrentUserService currentUserService,
+            ObjectMapper objectMapper
     ) {
         this.policyChangeDao = policyChangeDao;
         this.policyChangeSupportService = policyChangeSupportService;
         this.codeDescriptionService = codeDescriptionService;
+        this.currentUserService = currentUserService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -85,7 +101,14 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
     @Override
     public List<PolicyChangeCaseDto> findChangeCases(String policyNo) {
         requireText(policyNo, "policyNo");
-        return policyChangeDao.findChangeCases(policyNo);
+        List<PolicyChangeCaseDto> changeCases = policyChangeDao.findChangeCases(policyNo);
+        if (!currentUserService.securityEnabled() || currentUserService.hasRole("REVIEWER")) {
+            return changeCases;
+        }
+        String username = currentUserService.username();
+        return changeCases.stream()
+                .filter(changeCase -> Objects.equals(username, changeCase.getCreatedBy()))
+                .toList();
     }
 
     @Override
@@ -96,11 +119,83 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
         if (changeCase == null) {
             throw new NoSuchElementException("找不到保全受理資料: " + changeCaseNo);
         }
+        if (currentUserService.securityEnabled()
+                && !currentUserService.hasRole("REVIEWER")
+                && !Objects.equals(currentUserService.username(), changeCase.getCreatedBy())) {
+            throw new NoSuchElementException("找不到保全受理資料: " + changeCaseNo);
+        }
+        List<PolicyChangeFile> changeFiles = policyChangeDao.findChangeFilesByCaseNo(policyNo, policySeq, changeCaseNo);
+        Map<String, String> chineseNames = codeDescriptionService.findChtFieldNames();
+        changeFiles.forEach(file -> file.setSnapshotFields(buildSnapshotFields(file, chineseNames)));
+        List<PolicyChangeField> changeFields = policyChangeDao.findChangeFieldsByCaseNo(
+                policyNo, policySeq, changeCaseNo
+        );
+        changeFields.forEach(field -> field.setChineseName(resolveChineseFieldName(field.getChangeField(), chineseNames)));
         return PolicyChangeCaseDetailDto.builder()
                 .changeCase(changeCase)
-                .changeFields(policyChangeDao.findChangeFieldsByCaseNo(policyNo, policySeq, changeCaseNo))
-                .changeFiles(policyChangeDao.findChangeFilesByCaseNo(policyNo, policySeq, changeCaseNo))
+                .changeFields(changeFields)
+                .changeFiles(changeFiles)
                 .build();
+    }
+
+    private String resolveChineseFieldName(String changeField, Map<String, String> chineseNames) {
+        String simpleField = changeField == null
+                ? ""
+                : changeField.substring(changeField.lastIndexOf('.') + 1);
+        String jsonKey = snakeToCamel(simpleField);
+        return chineseNames.getOrDefault(jsonKey, changeField);
+    }
+
+    private String snakeToCamel(String value) {
+        StringBuilder result = new StringBuilder();
+        boolean upperNext = false;
+        for (char character : value.toCharArray()) {
+            if (character == '_') {
+                upperNext = true;
+            } else {
+                result.append(upperNext ? Character.toUpperCase(character) : character);
+                upperNext = false;
+            }
+        }
+        return result.toString();
+    }
+
+    private List<PolicyChangeSnapshotField> buildSnapshotFields(
+            PolicyChangeFile file,
+            Map<String, String> chineseNames
+    ) {
+        JsonNode before = readSnapshot(file.getContentBefore());
+        JsonNode after = readSnapshot(file.getContentAfter());
+        LinkedHashSet<String> keys = new LinkedHashSet<>();
+        before.fieldNames().forEachRemaining(keys::add);
+        after.fieldNames().forEachRemaining(keys::add);
+        return keys.stream()
+                .map(key -> PolicyChangeSnapshotField.builder()
+                        .jsonKey(key)
+                        .chineseName(chineseNames.getOrDefault(key, key))
+                        .contentBefore(displayJsonValue(before.get(key)))
+                        .contentAfter(displayJsonValue(after.get(key)))
+                        .build())
+                .toList();
+    }
+
+    private JsonNode readSnapshot(String content) {
+        if (content == null || content.isBlank()) {
+            return objectMapper.createObjectNode();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(content);
+            return node != null && node.isObject() ? node : objectMapper.createObjectNode();
+        } catch (JsonProcessingException exception) {
+            return objectMapper.createObjectNode();
+        }
+    }
+
+    private String displayJsonValue(JsonNode value) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
+        return value.isTextual() ? value.textValue() : value.toString();
     }
 
     private String[] parseCityAndDistrict(CodeDescription code) {

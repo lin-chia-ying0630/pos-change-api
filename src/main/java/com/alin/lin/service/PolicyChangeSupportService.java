@@ -9,6 +9,8 @@ public interface PolicyChangeSupportService {
 
     MainPolicyRide requireMainRide(String policyNo, Integer policySeq);
 
+    void validateChangeCaseAccess(String policyNo, Integer policySeq, String changeCaseNo, String changeItem);
+
     void ensureChangeCaseSaved(String policyNo, Integer policySeq, String changeCaseNo, String changeItem);
 
     void upsertFieldChange(String policyNo, Integer policySeq, String changeCaseNo, String changeItem, FieldChange fieldChange);

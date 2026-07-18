@@ -76,6 +76,9 @@ public class AddressChangeSaveServiceImpl implements AddressChangeSaveService {
                 .build();
 
         String addressChangeItem = codeDescriptionService.addressChangeItemCode();
+        policyChangeSupportService.validateChangeCaseAccess(
+                request.getPolicyNo(), request.getPolicySeq(), changeCaseNo, addressChangeItem
+        );
         List<FieldChange> fieldChanges = collectAddressFieldChanges(beforeAddress, afterAddress);
         policyChangeDao.deleteChangeFieldsByItemAndKey(
                 request.getPolicyNo(),

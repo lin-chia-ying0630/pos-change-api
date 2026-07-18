@@ -4,6 +4,7 @@ import com.alin.lin.dto.AddressChangeDto;
 import com.alin.lin.dto.AddressChangeRequest;
 import com.alin.lin.dto.CreateChangeCaseDto;
 import com.alin.lin.dto.CreateChangeCaseRequest;
+import com.alin.lin.dto.ChangeCaseEligibilityDto;
 import com.alin.lin.dto.MainAmountChangeDto;
 import com.alin.lin.dto.MainAmountChangeRequest;
 import com.alin.lin.dto.PolicyChangeCaseDetailDto;
@@ -56,6 +57,11 @@ public class PolicyChangeServiceImpl implements PolicyChangeService {
     @Override
     public PostalCodeAreaDto findPostalCodeArea(String postalCode) {
         return policyQueryService.findPostalCodeArea(postalCode);
+    }
+
+    @Override
+    public ChangeCaseEligibilityDto checkChangeCaseEligibility(String policyNo, Integer policySeq, String changeItem) {
+        return changeCaseDraftService.checkEligibility(policyNo, policySeq, changeItem);
     }
 
     @Override
