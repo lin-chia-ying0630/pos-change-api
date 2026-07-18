@@ -83,6 +83,12 @@
         ORDER BY code_field
     </select>
 
+    <select id="findAllCodes" resultType="com.alin.lin.entity.CodeDescription">
+        SELECT code_group, code_field, code_before, code_after, code_description
+        FROM code_description
+        ORDER BY code_group, code_field, code_before
+    </select>
+
     <select id="findCode" resultType="com.alin.lin.entity.CodeDescription">
         SELECT code_group,
                code_field,

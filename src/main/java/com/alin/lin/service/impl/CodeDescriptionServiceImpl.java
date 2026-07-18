@@ -21,6 +21,11 @@ public class CodeDescriptionServiceImpl implements CodeDescriptionService {
     }
 
     @Override
+    public List<CodeDescription> findAllCodes() {
+        return policyChangeDao.findAllCodes();
+    }
+
+    @Override
     public List<CodeDescription> findAddressTypes() {
         return findCodes(CodeTable.ADDRESS_TYPE);
     }

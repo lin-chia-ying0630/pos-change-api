@@ -25,4 +25,10 @@ public class UserAuthorizationController {
     public ResponseEntity<ResponseBodyDto<List<CodeDescription>>> findPermissions() {
         return ResponseUtil.ok(codeDescriptionService.findUserAuthorizationPermissions());
     }
+
+    // 畫面對應：Code 清單入口，顯示所有代碼與中文說明。
+    @GetMapping("/codes")
+    public ResponseEntity<ResponseBodyDto<List<CodeDescription>>> findAllCodes() {
+        return ResponseUtil.ok(codeDescriptionService.findAllCodes());
+    }
 }

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface CodeDescriptionService {
+    List<CodeDescription> findAllCodes();
     List<CodeDescription> findAddressTypes();
 
     List<CodeDescription> findAcceptanceStatuses();
