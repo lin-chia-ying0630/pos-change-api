@@ -164,6 +164,9 @@
                a.acceptance_status,
                COALESCE(status_cd.code_description, a.acceptance_status) AS acceptance_status_description,
                a.created_by,
+               a.created_at,
+               a.updated_by,
+               a.updated_at,
                a.reviewed_by,
                a.reviewed_at,
                GROUP_CONCAT(DISTINCT i.change_item ORDER BY i.change_item SEPARATOR ',') AS change_items,
@@ -183,7 +186,8 @@
          AND cd.code_before = i.change_item
         WHERE a.policy_no = #{policyNo}
         GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status,
-                 status_cd.code_description, a.created_by, a.reviewed_by, a.reviewed_at, a.created_at
+                 status_cd.code_description, a.created_by, a.created_at, a.updated_by, a.updated_at,
+                 a.reviewed_by, a.reviewed_at
         ORDER BY a.created_at DESC
     </select>
 
@@ -194,6 +198,9 @@
                a.acceptance_status,
                COALESCE(status_cd.code_description, a.acceptance_status) AS acceptance_status_description,
                a.created_by,
+               a.created_at,
+               a.updated_by,
+               a.updated_at,
                a.reviewed_by,
                a.reviewed_at,
                GROUP_CONCAT(DISTINCT i.change_item ORDER BY i.change_item SEPARATOR ',') AS change_items,
@@ -215,7 +222,8 @@
           AND a.policy_seq = #{policySeq}
           AND a.change_case_no = #{changeCaseNo}
         GROUP BY a.policy_no, a.policy_seq, a.change_case_no, a.acceptance_status,
-                 status_cd.code_description, a.created_by, a.reviewed_by, a.reviewed_at
+                 status_cd.code_description, a.created_by, a.created_at, a.updated_by, a.updated_at,
+                 a.reviewed_by, a.reviewed_at
     </select>
 
     <!-- 申請資格檢核：同保單、序號及保全變更項目的最近一筆受理案件。 -->
@@ -226,6 +234,9 @@
                a.acceptance_status,
                COALESCE(status_cd.code_description, a.acceptance_status) AS acceptance_status_description,
                a.created_by,
+               a.created_at,
+               a.updated_by,
+               a.updated_at,
                a.reviewed_by,
                a.reviewed_at,
                i.change_item AS change_items,
@@ -259,7 +270,8 @@
                reviewed_by,
                reviewed_at,
                created_at,
-               updated_at
+               updated_at,
+               updated_by
         FROM policy_change_acceptance
         WHERE policy_no = #{policyNo}
           AND policy_seq = #{policySeq}
@@ -505,6 +517,8 @@
     <update id="updateAcceptanceStatusIfCurrent">
         UPDATE policy_change_acceptance
         SET acceptance_status = #{acceptance.acceptanceStatus},
+            updated_by = #{acceptance.reviewedBy},
+            updated_at = CURRENT_TIMESTAMP,
             reviewed_by = COALESCE(#{acceptance.reviewedBy}, reviewed_by),
             reviewed_at = COALESCE(#{acceptance.reviewedAt}, reviewed_at)
         WHERE policy_no = #{acceptance.policyNo}

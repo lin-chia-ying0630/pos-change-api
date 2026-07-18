@@ -38,4 +38,7 @@ public class PolicyChangeAcceptance {
 
     // 更新時間
     private LocalDateTime updatedAt;
+
+    // 異動人員帳號
+    private String updatedBy;
 }

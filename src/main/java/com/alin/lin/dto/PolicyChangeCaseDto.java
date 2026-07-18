@@ -36,6 +36,15 @@ public class PolicyChangeCaseDto {
     // 覆核時間
     private LocalDateTime reviewedAt;
 
+    // 建立時間
+    private LocalDateTime createdAt;
+
+    // 異動人員帳號
+    private String updatedBy;
+
+    // 異動時間
+    private LocalDateTime updatedAt;
+
     // 保全變更項目清單
     private String changeItems;
 
