@@ -12,6 +12,8 @@ public interface CodeDescriptionService {
 
     List<CodeDescription> findChangeItems();
 
+    List<CodeDescription> findScreenPermissions();
+
     CodeDescription findPostalCodeZipCode3(String zipCode3);
 
     Map<String, String> findChtFieldNames();

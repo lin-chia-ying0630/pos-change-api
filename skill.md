@@ -160,6 +160,8 @@ docker build -t pos-change-api:latest .
 - Docker Maven 層使用 BuildKit cache；不要以 `dependency:go-offline` 預抓未使用的 dependency management BOM。
 # Deployment rules
 
+- Keep screen branch and role mapping in `main.code_description` (`main-screen/screen`); do not duplicate the mapping in frontend labels.
+
 - Production uses JDBC-backed `users` and `authorities`; local/test may use in-memory users.
 - Never commit passwords, password hashes, `.env` files, or database backups.
 - Back up MySQL before every Flyway migration and rehearse V6/V7 against a sanitized copy.

@@ -36,4 +36,7 @@ public class PolicyDetailDto {
 
     // 保全變更項目代碼清單
     private List<CodeDescription> changeItems;
+
+    // 畫面支線與角色代碼對照
+    private List<CodeDescription> screenPermissions;
 }

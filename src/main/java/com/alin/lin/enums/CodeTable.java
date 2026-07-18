@@ -17,7 +17,10 @@ public enum CodeTable {
     CHANGE_ITEM("policy-change-item", "change_item"),
 
     // 郵遞區號前三碼對應縣市區
-    POSTAL_CODE_ZIP_CODE3("postal-code", "zip_code3");
+    POSTAL_CODE_ZIP_CODE3("postal-code", "zip_code3"),
+
+    // 畫面支線與角色
+    SCREEN_PERMISSION("main-screen", "screen");
 
     private final String codeGroup;
     private final String codeField;

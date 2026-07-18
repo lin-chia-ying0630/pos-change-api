@@ -241,6 +241,8 @@ logging.level.com.alin.lin.dao=info
 Debug SQL 統一由 `MaskedSqlLogInterceptor` 輸出，保單號碼、地址、email、電話與手機會遮罩。Log 同時輸出 stdout 與 rolling file；容器或 K8s 應以 stdout 收集為主。
 # 正式部署安全設定
 
+`main.code_description` 的 `main-screen/screen` 對照表定義四個畫面支線：`CREATE`、`UPDATE`、`DELETE` 僅對應 `MAKER`，`REVIEW` 對應 `REVIEWER`。查詢保單時一併回傳給前端；實際 API 權限仍由 Spring Security 後端控管。
+
 `prod` profile 使用 JDBC 帳號表 `users` / `authorities`，啟動時以環境變數提供的帳號密碼建立或更新 BCrypt 雜湊；資料庫不保存明文密碼。`local` 與 `test` 才使用 In-Memory 帳號。
 
 正式部署前請先執行前端專案的 `./backup-mysql.sh`，再啟動 API。Flyway migration 是 forward-only，若需回復必須使用部署前備份與上一版 image，不可修改已套用的 migration。

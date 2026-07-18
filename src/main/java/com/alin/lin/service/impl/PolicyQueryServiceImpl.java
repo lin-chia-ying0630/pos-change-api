@@ -70,6 +70,7 @@ public class PolicyQueryServiceImpl implements PolicyQueryService {
                 .addressTypes(codeDescriptionService.findAddressTypes())
                 .acceptanceStatuses(codeDescriptionService.findAcceptanceStatuses())
                 .changeItems(codeDescriptionService.findChangeItems())
+                .screenPermissions(codeDescriptionService.findScreenPermissions())
                 .build();
     }
 
