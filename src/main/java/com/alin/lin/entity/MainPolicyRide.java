@@ -42,4 +42,8 @@ public class MainPolicyRide {
 
     // 更新時間
     private LocalDateTime updatedAt;
+    private String createdBy;
+    private String updatedBy;
+    private String reviewedBy;
+    private LocalDateTime reviewedAt;
 }

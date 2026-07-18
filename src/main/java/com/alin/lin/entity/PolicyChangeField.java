@@ -47,4 +47,8 @@ public class PolicyChangeField {
 
     // 最後更新時間
     private LocalDateTime updatedAt;
+    private String createdBy;
+    private String updatedBy;
+    private String reviewedBy;
+    private LocalDateTime reviewedAt;
 }

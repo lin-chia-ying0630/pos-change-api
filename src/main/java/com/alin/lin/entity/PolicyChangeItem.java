@@ -26,4 +26,8 @@ public class PolicyChangeItem {
 
     // 建立時間
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private String updatedBy;
+    private String reviewedBy;
+    private LocalDateTime reviewedAt;
 }
