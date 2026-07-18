@@ -30,6 +30,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.ArrayList;
 
 @Configuration
 @EnableWebSecurity
@@ -86,7 +87,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.PATCH, "/api/change-cases/*/status").hasRole("REVIEWER")
                         .requestMatchers(HttpMethod.POST, "/api/change-cases", "/api/change-cases/**").hasRole("MAKER")
-                        .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("MAKER", "REVIEWER")
+                        .requestMatchers(HttpMethod.GET, "/api/user-authorizations/codes").hasAnyRole("MAKER", "REVIEWER")
+                        .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("MAKER", "REVIEWER", "USER", "ADMIN")
                         .anyRequest().denyAll()
                 )
                 .build();
@@ -108,10 +110,12 @@ public class SecurityConfig {
                 "POS_REVIEWER_USERNAME",
                 "POS_REVIEWER_PASSWORD"
         );
+        requireOptionalCredentialPair(securityProperties.getUserUsername(), securityProperties.getUserPassword(), "POS_USER_USERNAME", "POS_USER_PASSWORD");
+        requireOptionalCredentialPair(securityProperties.getAdminUsername(), securityProperties.getAdminPassword(), "POS_ADMIN_USERNAME", "POS_ADMIN_PASSWORD");
         if (securityProperties.getMakerUsername().equals(securityProperties.getReviewerUsername())) {
             throw new IllegalStateException("經辦與覆核帳號不可相同");
         }
-        return new InMemoryUserDetailsManager(
+        List<UserDetails> users = new ArrayList<>(List.of(
                 User.withUsername(securityProperties.getMakerUsername())
                         .password(passwordEncoder().encode(securityProperties.getMakerPassword()))
                         .roles("MAKER")
@@ -120,7 +124,10 @@ public class SecurityConfig {
                         .password(passwordEncoder().encode(securityProperties.getReviewerPassword()))
                         .roles("REVIEWER")
                         .build()
-        );
+        ));
+        addOptionalUser(users, securityProperties.getUserUsername(), securityProperties.getUserPassword(), "USER");
+        addOptionalUser(users, securityProperties.getAdminUsername(), securityProperties.getAdminPassword(), "ADMIN");
+        return new InMemoryUserDetailsManager(users);
     }
 
     @Bean
@@ -131,6 +138,8 @@ public class SecurityConfig {
         manager.setJdbcTemplate(new JdbcTemplate(dataSource));
         provisionUser(manager, securityProperties.getMakerUsername(), securityProperties.getMakerPassword(), "ROLE_MAKER");
         provisionUser(manager, securityProperties.getReviewerUsername(), securityProperties.getReviewerPassword(), "ROLE_REVIEWER");
+        provisionUser(manager, securityProperties.getUserUsername(), securityProperties.getUserPassword(), "ROLE_USER");
+        provisionUser(manager, securityProperties.getAdminUsername(), securityProperties.getAdminPassword(), "ROLE_ADMIN");
         if (securityProperties.getMakerUsername().equals(securityProperties.getReviewerUsername())) {
             throw new IllegalStateException("經辦與覆核帳號不可相同");
         }
@@ -155,6 +164,17 @@ public class SecurityConfig {
         } else {
             manager.createUser(user);
         }
+    }
+
+    private void addOptionalUser(List<UserDetails> users, String username, String password, String role) {
+        if (username != null && !username.isBlank() && password != null && !password.isBlank()) {
+            users.add(User.withUsername(username).password(passwordEncoder().encode(password)).roles(role).build());
+        }
+    }
+
+    private void requireOptionalCredentialPair(String username, String password, String usernameEnvironment, String passwordEnvironment) {
+        if ((username == null || username.isBlank()) && (password == null || password.isBlank())) return;
+        requireCredentialPair(username, password, usernameEnvironment, passwordEnvironment);
     }
 
     @Bean
