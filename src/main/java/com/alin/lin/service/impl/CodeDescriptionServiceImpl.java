@@ -41,6 +41,11 @@ public class CodeDescriptionServiceImpl implements CodeDescriptionService {
     }
 
     @Override
+    public List<CodeDescription> findUserAuthorizationPermissions() {
+        return findCodes(CodeTable.USER_AUTHORIZATION);
+    }
+
+    @Override
     public CodeDescription findPostalCodeZipCode3(String zipCode3) {
         return policyChangeDao.findCode(
                 CodeTable.POSTAL_CODE_ZIP_CODE3.getCodeGroup(),

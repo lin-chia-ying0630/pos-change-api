@@ -20,7 +20,10 @@ public enum CodeTable {
     POSTAL_CODE_ZIP_CODE3("postal-code", "zip_code3"),
 
     // 畫面支線與角色
-    SCREEN_PERMISSION("main-screen", "screen");
+    SCREEN_PERMISSION("main-screen", "screen"),
+
+    // 使用者授權畫面支線與角色
+    USER_AUTHORIZATION("main-user", "authorities");
 
     private final String codeGroup;
     private final String codeField;
